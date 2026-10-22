@@ -1,0 +1,26 @@
+{
+  "architecture": "x86_64",
+  "reference_repositories": {
+    "core": {"servers": ["https://geo.mirror.pkgbuild.com/$repo/os/$arch"]},
+    "extra": {"servers": ["https://geo.mirror.pkgbuild.com/$repo/os/$arch"]},
+    "multilib": {"servers": ["https://geo.mirror.pkgbuild.com/$repo/os/$arch"]}
+  },
+  "repositories": {
+    "lunaos-repo": {
+      "package": "lunaos-appstream-data",
+      "priority": 20,
+      "servers": [
+        "https://cdn.lenuma.ru/$repo",
+        "https://github.com/Lenuma-inc/lunaos-repo/releases/download/$repo"
+      ]
+    },
+    "chaotic-aur": {
+      "package": "chaotic-aur-appstream-data",
+      "priority": -10,
+      "servers": [
+        "https://cdn-mirror.chaotic.cx/$repo/$arch",
+        "https://geo-mirror.chaotic.cx/$repo/$arch"
+      ]
+    }
+  }
+}

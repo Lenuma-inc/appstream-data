@@ -1,0 +1,14 @@
+pkgname=lunaos-appstream-data
+pkgver=@VERSION@
+pkgrel=@RELEASE@
+pkgdesc='AppStream application catalog and icons for the LunaOS repository'
+arch=('any')
+url='https://github.com/Lenuma-inc/lunaos-repo'
+license=('LicenseRef-AppStream-Data')
+source=("${pkgname}-${pkgver}.tar.gz")
+sha256sums=('@SHA256@')
+
+package() {
+  install -dm755 "$pkgdir/usr/share"
+  cp -a --no-preserve=ownership "$srcdir/$pkgname-$pkgver/usr/share/." "$pkgdir/usr/share/"
+}

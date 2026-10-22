@@ -1,0 +1,89 @@
+name: Build AppStream catalogs
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 3 * * *'
+  push:
+    paths:
+      - 'generate.py'
+      - 'test_generate.py'
+      - 'repositories.json'
+      - 'policy.json'
+      - 'update-version.py'
+      - 'packages/**'
+      - '.github/workflows/appstream.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: appstream-catalogs
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - name: Install generator
+        run: >-
+          pacman -Syu --noconfirm --needed python python-yaml appstream-generator appstream
+          libheif libjxl openslide poppler-glib imagemagick svt-av1 rav1e ffmpeg git
+      - uses: actions/checkout@v4
+      - name: Prepare build user
+        run: |
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+      - name: Test
+        run: runuser -u builder -- python -m unittest discover -v
+      - name: Set catalog version
+        run: runuser -u builder -- python update-version.py
+      - uses: actions/cache@v4
+        with:
+          path: work
+          key: appstream-${{ runner.os }}-${{ hashFiles('generate.py', 'repositories.json', 'policy.json') }}-${{ github.run_id }}
+          restore-keys: |
+            appstream-${{ runner.os }}-${{ hashFiles('generate.py', 'repositories.json', 'policy.json') }}-
+            appstream-${{ runner.os }}-
+      - name: Restore workspace ownership
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/work"
+          chown -R builder:builder "$GITHUB_WORKSPACE/work"
+      - name: Generate catalogs and source packages
+        run: |
+          runuser -u builder -- python generate.py all --explain \
+            --version "$(sed -n 's/^pkgver=//p' PKGBUILD)" \
+            --release "$(sed -n 's/^pkgrel=//p' PKGBUILD)"
+      - name: Build pacman packages
+        run: |
+          for directory in dist/lunaos-appstream-data dist/chaotic-aur-appstream-data; do
+            (cd "$directory" && runuser -u builder -- makepkg --cleanbuild --noconfirm)
+          done
+          cd packages/lunaos-appstream-data-common
+          runuser -u builder -- makepkg --cleanbuild --noconfirm --nodeps
+      - name: Publish successful catalog version for lunaos-repo buildbot
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PKGBUILD .SRCINFO
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update AppStream catalog package version'
+            git push origin HEAD:main
+          fi
+      - name: Upload packages and generation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appstream-catalogs
+          if-no-files-found: warn
+          path: |
+            dist/
+            packages/lunaos-appstream-data-common/*.pkg.tar.zst
+            work/*/manifest.json
+            work/*/generation.json
+            work/*/export/hints/
+            work/*/export/html/
+            work/*/export/logs/

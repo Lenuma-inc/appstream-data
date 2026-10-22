@@ -1,0 +1,7 @@
+{
+  "exclude_packages": ["*-git"],
+  "keep_packages": [],
+  "binary_suffixes": ["-bin"],
+  "hide_binary_if_base_exists": true,
+  "exclude_components": []
+}

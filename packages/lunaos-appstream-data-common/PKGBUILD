@@ -1,0 +1,16 @@
+pkgname=lunaos-appstream-data-common
+pkgver=1
+pkgrel=1
+pkgdesc='AppStream catalogs for LunaOS, Arch Linux and Chaotic-AUR'
+arch=('any')
+url='https://github.com/Lenuma-inc/lunaos-repo'
+license=('MIT')
+depends=(
+  'archlinux-appstream-data'
+  'lunaos-appstream-data'
+  'chaotic-aur-appstream-data'
+)
+
+package() {
+  :
+}
