@@ -386,8 +386,14 @@ def generate(repo, args, architecture):
             raise ValueError(f"Missing Arch backend database: {tarball}; run sync first")
     path = workspace / "asgen-config.json"
     path.write_text(json.dumps(generator_config(repo, workspace, architecture), indent=2) + "\n")
+    # asgen caches by name/version/architecture, not by archive checksum. Local
+    # metainfo overrides can change while the upstream package version stays put.
+    # Forget both metadata and contents so a cached desktop-only result is replaced.
+    for name in sorted(manifest.get("metadata_overrides", {})):
+        subprocess.run(["appstream-generator", "--workspace", str(workspace),
+                        "forget", token(name)], check=True)
     subprocess.run(["appstream-generator", "--workspace", str(workspace),
-                    "run", "rolling"], check=True)
+                    "--force", "run", "rolling"], check=True)
     if len(list((workspace / "export/data").rglob("Components-*.xml.gz"))) != 1:
         raise ValueError(f"asgen did not export a catalog for {repo}; inspect its logs and hints")
     stamp.write_text(json.dumps({"manifest_sha256": digest(workspace / "manifest.json"),
