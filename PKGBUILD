@@ -2,7 +2,7 @@
 # Catalog versions are refreshed by .github/workflows/appstream.yml.
 pkgbase=lunaos-appstream-data
 pkgname=('lunaos-appstream-data' 'chaotic-aur-appstream-data' 'lunaos-appstream-data-common')
-pkgver=20261022
+pkgver=20261024
 pkgrel=1
 pkgdesc='AppStream application catalogs for LunaOS and Chaotic-AUR'
 arch=('any')

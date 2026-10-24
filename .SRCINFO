@@ -1,6 +1,6 @@
 pkgbase = lunaos-appstream-data
 	pkgdesc = AppStream application catalogs for LunaOS and Chaotic-AUR
-	pkgver = 20261022
+	pkgver = 20261024
 	pkgrel = 1
 	url = https://github.com/Lenuma-inc/appstream-data
 	arch = any
