@@ -2,7 +2,7 @@
 pkgbase=lunaos-appstream-data
 pkgname=('lunaos-appstream-data' 'chaotic-aur-appstream-data' 'lunaos-appstream-data-common')
 pkgver=20261024
-pkgrel=4
+pkgrel=5
 pkgdesc='AppStream application catalogs for LunaOS and Chaotic-AUR'
 arch=('any')
 url='https://github.com/Lenuma-inc/appstream-data'
@@ -11,8 +11,8 @@ options=('!strip' '!debug')
 
 source=("${url}/releases/download/${pkgver}-${pkgrel}/lunaos-appstream-data-${pkgver}.tar.gz"
         "${url}/releases/download/${pkgver}-${pkgrel}/chaotic-aur-appstream-data-${pkgver}.tar.gz")
-sha256sums=('fe88a0755b8e0706d9d82859b68fef239964c3aea7d15bc6270f27093caf8a95'
-            '9481c4d3c626da83e57c558282df6c1c4b681df4b5a82cb3cde772bf86768a25')
+sha256sums=('439d1535ebfdad9674c83f18cd84a3aa3f91ccdb802c8945fee04f55a4f343eb'
+            '54a66f7fc438368d542761e36174b0a4301dac426212d17cc44d8f0cd08c42bd')
 
 _install_catalog() {
   install -dm755 "$pkgdir/usr/share"
