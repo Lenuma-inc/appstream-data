@@ -556,12 +556,6 @@ def package_repo(repo, config, args):
         )
         filename = f"{pkgname}-{args.version}.tar.gz"
         source_archive(stage, output / filename, f"{pkgname}-{args.version}")
-    template = (ROOT / "packages" / pkgname / "PKGBUILD.in").read_text()
-    template = template.replace("@VERSION@", args.version).replace("@RELEASE@", str(args.release))
-    template = template.replace("@SHA256@", digest(output / filename))
-    (output / "PKGBUILD").write_text(template)
-    with (output / ".SRCINFO").open("w") as stream:
-        subprocess.run(["makepkg", "--printsrcinfo"], cwd=output, stdout=stream, check=True)
     print(f"Prepared {output}: {count} components, origin={origin}", flush=True)
 
 
@@ -578,10 +572,9 @@ def main():
                         help="Local .files databases for offline plan")
     parser.add_argument("--jobs", type=int, default=4, help="Concurrent downloads")
     parser.add_argument("--version", default=datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d"))
-    parser.add_argument("--release", type=int, default=1)
     args = parser.parse_args()
-    if args.jobs < 1 or args.release < 1 or not re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", args.version):
-        parser.error("jobs/release must be positive; version must be numeric, e.g. 20261022")
+    if args.jobs < 1 or not re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", args.version):
+        parser.error("jobs must be positive; version must be numeric, e.g. 20261022")
     config = json.loads(args.config.read_text())
     args.policy_data = load_policy(args.policy)
     architecture = token(config["architecture"])

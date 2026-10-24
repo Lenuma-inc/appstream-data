@@ -1,25 +1,16 @@
 pkgbase = lunaos-appstream-data
 	pkgdesc = AppStream application catalogs for LunaOS and Chaotic-AUR
-	pkgver = 20261024
+	pkgver = 20261023
 	pkgrel = 1
 	url = https://github.com/Lenuma-inc/appstream-data
 	arch = any
 	license = LicenseRef-AppStream-Data
-	makedepends = appstream-generator>=0.10.2
-	makedepends = appstream
-	makedepends = python
-	makedepends = python-yaml
-	makedepends = libarchive
-	makedepends = libheif
-	makedepends = libjxl
-	makedepends = openslide
-	makedepends = poppler-glib
-	makedepends = imagemagick
-	makedepends = svt-av1
-	makedepends = rav1e
-	makedepends = ffmpeg
 	options = !strip
 	options = !debug
+	source = https://github.com/Lenuma-inc/appstream-data/releases/download/20261023-1/lunaos-appstream-data-20261023.tar.gz
+	source = https://github.com/Lenuma-inc/appstream-data/releases/download/20261023-1/chaotic-aur-appstream-data-20261023.tar.gz
+	sha256sums = d87d6bd34a9c5472199f2d56f5629db4014fa0b7211a92613b83a478da8ce2b3
+	sha256sums = a95f22c7f32cccd3bcb812a63f2b53e970fd52b1a1244050d21fae80881f1bc9
 
 pkgname = lunaos-appstream-data
 	pkgdesc = AppStream application catalog and icons for the LunaOS repository

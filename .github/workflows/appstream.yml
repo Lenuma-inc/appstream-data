@@ -7,11 +7,10 @@ on:
   push:
     paths:
       - 'generate.py'
-      - 'test_generate.py'
       - 'repositories.json'
       - 'policy.json'
       - 'update-version.py'
-      - 'packages/**'
+      - 'PKGBUILD'
       - '.github/workflows/appstream.yml'
 
 permissions:
@@ -29,14 +28,12 @@ jobs:
       - name: Install generator
         run: >-
           pacman -Syu --noconfirm --needed python python-yaml appstream-generator appstream
-          libheif libjxl openslide poppler-glib imagemagick svt-av1 rav1e ffmpeg git
+          libheif libjxl openslide poppler-glib imagemagick svt-av1 rav1e ffmpeg git github-cli
       - uses: actions/checkout@v4
       - name: Prepare build user
         run: |
           useradd -m builder
           chown -R builder:builder "$GITHUB_WORKSPACE"
-      - name: Test
-        run: runuser -u builder -- python -m unittest discover -v
       - name: Set catalog version
         run: runuser -u builder -- python update-version.py
       - uses: actions/cache@v4
@@ -53,15 +50,24 @@ jobs:
       - name: Generate catalogs and source packages
         run: |
           runuser -u builder -- python generate.py all --explain \
-            --version "$(sed -n 's/^pkgver=//p' PKGBUILD)" \
-            --release "$(sed -n 's/^pkgrel=//p' PKGBUILD)"
+            --version "$(sed -n 's/^pkgver=//p' PKGBUILD)"
+      - name: Finalize source checksums
+        run: runuser -u builder -- python update-version.py --finalize
       - name: Build pacman packages
         run: |
-          for directory in dist/lunaos-appstream-data dist/chaotic-aur-appstream-data; do
-            (cd "$directory" && runuser -u builder -- makepkg --cleanbuild --noconfirm)
-          done
-          cd packages/lunaos-appstream-data-common
+          cp dist/lunaos-appstream-data/*.tar.gz dist/chaotic-aur-appstream-data/*.tar.gz .
           runuser -u builder -- makepkg --cleanbuild --noconfirm --nodeps
+      - name: Publish catalog sources
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(sed -n 's/^pkgver=//p' PKGBUILD)
+          release=$(sed -n 's/^pkgrel=//p' PKGBUILD)
+          gh release create "$version-$release" --target "$GITHUB_SHA" \
+            --title "$version-$release" --notes 'Generated AppStream catalogs.' \
+            dist/lunaos-appstream-data/*.tar.gz dist/chaotic-aur-appstream-data/*.tar.gz
       - name: Publish successful catalog version for lunaos-repo buildbot
         if: github.ref == 'refs/heads/main'
         run: |
@@ -81,7 +87,7 @@ jobs:
           if-no-files-found: warn
           path: |
             dist/
-            packages/lunaos-appstream-data-common/*.pkg.tar.zst
+            *.pkg.tar.zst
             work/*/manifest.json
             work/*/generation.json
             work/*/export/hints/

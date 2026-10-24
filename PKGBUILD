@@ -1,28 +1,18 @@
-# Build all three packages from a git checkout of this repository.
-# Catalog versions are refreshed by .github/workflows/appstream.yml.
+# Package catalogs already generated and published by CI.
 pkgbase=lunaos-appstream-data
 pkgname=('lunaos-appstream-data' 'chaotic-aur-appstream-data' 'lunaos-appstream-data-common')
-pkgver=20261024
+pkgver=20261023
 pkgrel=1
 pkgdesc='AppStream application catalogs for LunaOS and Chaotic-AUR'
 arch=('any')
 url='https://github.com/Lenuma-inc/appstream-data'
 license=('LicenseRef-AppStream-Data')
-makedepends=('appstream-generator>=0.10.2' 'appstream' 'python' 'python-yaml' 'libarchive'
-             'libheif' 'libjxl' 'openslide' 'poppler-glib' 'imagemagick' 'svt-av1' 'rav1e' 'ffmpeg')
 options=('!strip' '!debug')
 
-build() {
-  # The buildbot clones the whole repository. Run from that checkout so templates
-  # and policy are available. Cache only resources, never executable package content.
-  python "$startdir/generate.py" all \
-    --work "${APPSTREAM_WORK_DIR:-$srcdir/work}" \
-    --output "$srcdir/catalogs" --version "$pkgver" --release "$pkgrel"
-  local catalog
-  for catalog in lunaos-appstream-data chaotic-aur-appstream-data; do
-    bsdtar -xf "$srcdir/catalogs/$catalog/$catalog-$pkgver.tar.gz" -C "$srcdir"
-  done
-}
+source=("${url}/releases/download/${pkgver}-${pkgrel}/lunaos-appstream-data-${pkgver}.tar.gz"
+        "${url}/releases/download/${pkgver}-${pkgrel}/chaotic-aur-appstream-data-${pkgver}.tar.gz")
+sha256sums=('d87d6bd34a9c5472199f2d56f5629db4014fa0b7211a92613b83a478da8ce2b3'
+            'a95f22c7f32cccd3bcb812a63f2b53e970fd52b1a1244050d21fae80881f1bc9')
 
 _install_catalog() {
   install -dm755 "$pkgdir/usr/share"
