@@ -35,5 +35,91 @@
     "credit": "Philipp Unger and translators",
     "metadata_license": "CC0-1.0",
     "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
+  },
+  "cadcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/cadcraft/e59195edb83fc9176eb3cd2fadf9cb2c4ee0eb8e/packaging/linux/ai.storyteller.cadcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "deckcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/deckcraft/5fadda5ecfda00e11e364f095a31974f54857e21/packaging/linux/ai.storyteller.deckcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "designcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/designcraft/d8d78851729a2c1a10e5bfad7c591f3de78651a0/packaging/linux/ai.storyteller.designcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "effectcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/effectcraft/eb5108786b90bf994a6abe4e6c0b2614c6aeaa29/packaging/linux/ai.storyteller.effectcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "figcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/figcraft/e3e39bbc4dc94d58a70775fae17ee0d7a486a95f/packaging/linux/ai.storyteller.figcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Added a screenshot from the upstream README. Screenshot URLs pinned to upstream commits.",
+    "screenshot_url": "https://raw.githubusercontent.com/storytold/figcraft/e3e39bbc4dc94d58a70775fae17ee0d7a486a95f/docs/images/shot-1-hero.png"
+  },
+  "filmcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/filmcraft/fa550ce2d07bdfee6b1d7b6835e8abc8c6913d00/packaging/linux/ai.storyteller.filmcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "gridcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/gridcraft/72c1d57d1e7ec4b86b784a60ac5bad943ffe5bdb/packaging/linux/ai.storyteller.gridcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Added a screenshot from the upstream README. Screenshot URLs pinned to upstream commits.",
+    "screenshot_url": "https://raw.githubusercontent.com/storytold/gridcraft/72c1d57d1e7ec4b86b784a60ac5bad943ffe5bdb/docs/images/hero-sales.png"
+  },
+  "lightcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/lightcraft/4ae3089420cb57d4c839e51a735d4f48271cbf17/packaging/linux/ai.storyteller.lightcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "onlyoffice-bin": {
+    "url": "https://raw.githubusercontent.com/flathub/org.onlyoffice.desktopeditors/f88f5d2ce96e387ee0728273bdfa43e3a639b8ac/org.onlyoffice.desktopeditors.metainfo.xml",
+    "credit": "ONLYOFFICE and Flathub contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Adapted desktop launchable, stock icon and categories for the native package; release history and Flatpak repository link omitted. Screenshot URLs pinned to upstream commits."
+  },
+  "pdfcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/pdfcraft/86730ed14466c5388173e32ef5a3ec015e523b9a/packaging/linux/ai.storyteller.pdfcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "photocraft": {
+    "url": "https://raw.githubusercontent.com/storytold/photocraft/1c3db2e5c35a4f8c544011e57c8026ccb9741926/packaging/linux/ai.storyteller.photocraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "soundcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/soundcraft/ef646cf6263e0a381b84170ef1d655455ef669e9/packaging/linux/ai.storyteller.soundcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "vectorcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/vectorcraft/50d976e1e6b92ab3633d6c8cc174268e5e6ffef9/packaging/linux/ai.storyteller.vectorcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "wordcraft": {
+    "url": "https://raw.githubusercontent.com/storytold/wordcraft/c524027f34be2d1322b23064f80662d3638cf880/packaging/linux/ai.storyteller.wordcraft.metainfo.xml.in",
+    "credit": "Learning Machines LLC and ArtCraft contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
   }
 }

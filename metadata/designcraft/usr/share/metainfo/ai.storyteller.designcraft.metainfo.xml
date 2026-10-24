@@ -1,0 +1,55 @@
+<?xml version='1.0' encoding='utf-8'?>
+<component type="desktop-application">
+  <id>ai.storyteller.designcraft</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <name>DesignCraft</name>
+  <summary>Lay out magazines, books and print documents</summary>
+  <developer id="ai.storyteller">
+    <name>Learning Machines LLC</name>
+  </developer>
+  <description>
+    <p>
+      DesignCraft is a page layout. Lay out magazines, books and print documents
+    </p>
+  </description>
+  <launchable type="desktop-id">ai.storyteller.designcraft.desktop</launchable>
+  <icon type="stock">ai.storyteller.designcraft</icon>
+  <url type="homepage">https://getartcraft.com/apps/designcraft</url>
+  <url type="bugtracker">https://github.com/storytold/designcraft/issues</url>
+  <url type="help">https://github.com/storytold/designcraft</url>
+  <url type="contact">https://discord.gg/artcraft</url>
+  <categories>
+    <category>Graphics</category>
+    <category>RasterGraphics</category>
+    <category>Photography</category>
+  </categories>
+  <keywords>
+    <keyword>photo</keyword>
+    <keyword>image editor</keyword>
+    <keyword>psd</keyword>
+    <keyword>layers</keyword>
+  </keywords>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Magazine spread with threaded text frames and layout properties</caption>
+      <image type="source" width="1600" height="1000">https://raw.githubusercontent.com/storytold/designcraft/d8d78851729a2c1a10e5bfad7c591f3de78651a0/docs/images/ui-spread.png</image>
+    </screenshot>
+  </screenshots>
+  <branding>
+    <color type="primary" scheme_preference="light">#9fd0ff</color>
+    <color type="primary" scheme_preference="dark">#1f64ba</color>
+  </branding>
+  <requires>
+    <display_length compare="ge">760</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>tablet</control>
+  </supports>
+  <provides>
+    <binary>designcraft</binary>
+  </provides>
+  <content_rating type="oars-1.1" />
+</component>
