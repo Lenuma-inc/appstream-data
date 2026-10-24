@@ -220,12 +220,23 @@ def write_database(path, records, with_files):
     temporary.replace(path)
 
 
-def resource_package(source, destination):
+def resource_package(source, destination, package_name):
     """Keep only metadata/resources, without extracting an archive onto the host."""
-    command = ["bsdtar", "--zstd", "-cf", str(destination)]
+    command = ["bsdtar"]
     for pattern in RESOURCE_PATTERNS:
         command.extend(["--include", pattern, "--include", "./" + pattern])
-    subprocess.run(command + ["@" + str(source)], check=True)
+    overlay = ROOT / "metadata" / package_name
+    if not overlay.is_dir():
+        subprocess.run(command + ["--zstd", "-cf", str(destination), "@" + str(source)], check=True)
+        return
+    # Replace packaged metainfo to avoid duplicate IDs and stale launchable names.
+    for pattern in ("usr/share/metainfo/*", "usr/share/appdata/*", "*.metainfo.xml", "*.appdata.xml"):
+        command.extend(["--exclude", pattern, "--exclude", "./" + pattern])
+    with tempfile.TemporaryDirectory(prefix="metadata-", dir=destination.parent) as temp:
+        filtered = Path(temp) / "resources.tar"
+        subprocess.run(command + ["-cf", str(filtered), "@" + str(source)], check=True)
+        subprocess.run(["bsdtar", "--zstd", "-cf", str(destination), "@" + str(filtered),
+                        "-C", str(overlay), "usr"], check=True)
 
 
 def staged_record(record, package):
@@ -234,7 +245,10 @@ def staged_record(record, package):
     info["CSIZE"] = [str(package.stat().st_size)]
     info["SHA256SUM"] = [digest(package)]
     desc = "".join(f"%{key}%\n" + "\n".join(value) + "\n\n" for key, value in info.items())
-    return dict(record, desc=desc.encode(), fields=info)
+    listing = subprocess.check_output(["bsdtar", "-tf", str(package)], text=True)
+    paths = sorted({line.removeprefix("./") for line in listing.splitlines()})
+    files = "%FILES%\n" + "\n".join(paths) + "\n\n"
+    return dict(record, desc=desc.encode(), files=files.encode(), fields=info)
 
 
 def sync_repo(repo, config, args, architecture):
@@ -251,7 +265,15 @@ def sync_repo(repo, config, args, architecture):
     def download(record):
         info = record["fields"]
         filename, checksum = info["FILENAME"][0], info["SHA256SUM"][0].lower()
-        target = cache / checksum / filename
+        overlay = ROOT / "metadata" / info["NAME"][0]
+        target = cache / checksum
+        if overlay.is_dir():
+            metadata_hash = hashlib.sha256("".join(
+                f"{p.relative_to(overlay)}:{digest(p)}\n"
+                for p in sorted(overlay.rglob("*")) if p.is_file()
+            ).encode()).hexdigest()
+            target /= metadata_hash
+        target /= filename
         marker = target.with_name(filename + ".sha256")
         if target.is_file() and marker.is_file() and digest(target) == marker.read_text().strip():
             return filename, target
@@ -262,7 +284,7 @@ def sync_repo(repo, config, args, architecture):
             original = Path(temp) / filename
             fetch([f"{s}/{filename}" for s in mirrors], original, checksum)
             temporary = target.with_name(filename + ".part")
-            resource_package(original, temporary)
+            resource_package(original, temporary, info["NAME"][0])
             temporary.replace(target)
         marker.write_text(digest(target) + "\n")
         return filename, target
@@ -295,6 +317,10 @@ def sync_repo(repo, config, args, architecture):
         "policy": args.policy_data,
         "excluded_packages": excluded,
         "resource_schema": RESOURCE_SCHEMA,
+        "metadata_overrides": {
+            name: source for name, source in json.loads((ROOT / "metadata/sources.json").read_text()).items()
+            if name in {r["fields"]["NAME"][0] for r in selected.values()}
+        },
         "packages": [{"name": r["fields"]["NAME"][0],
                       "version": r["fields"]["VERSION"][0],
                       "sha256": r["fields"]["SHA256SUM"][0],
@@ -553,6 +579,8 @@ def package_repo(repo, config, args):
             "These retain their respective upstream licenses; the generator's MIT license\n"
             "does not relicense them. Package source URLs and declared package licenses\n"
             "are recorded in /usr/share/doc/" + pkgname + "/manifest.json.\n"
+            "Supplemental metadata sources, credits, changes and licenses are recorded\n"
+            "in the metadata_overrides section of the same manifest.\n"
         )
         filename = f"{pkgname}-{args.version}.tar.gz"
         source_archive(stage, output / filename, f"{pkgname}-{args.version}")

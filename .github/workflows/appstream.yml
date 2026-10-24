@@ -9,6 +9,7 @@ on:
       - 'generate.py'
       - 'repositories.json'
       - 'policy.json'
+      - 'metadata/**'
       - 'update-version.py'
       - 'PKGBUILD'
       - '.github/workflows/appstream.yml'

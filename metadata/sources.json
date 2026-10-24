@@ -1,0 +1,39 @@
+{
+  "spotify": {
+    "url": "https://github.com/flathub/com.spotify.Client/blob/master/com.spotify.Client.appdata.xml",
+    "credit": "Flathub contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
+  },
+  "anydesk-bin": {
+    "url": "https://github.com/flathub/com.anydesk.Anydesk/blob/master/com.anydesk.Anydesk.metainfo.xml",
+    "credit": "Flathub contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
+  },
+  "zotero": {
+    "url": "https://github.com/flathub/org.zotero.Zotero/blob/master/org.zotero.Zotero.appdata.xml",
+    "credit": "Flathub contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
+  },
+  "minecraft-launcher": {
+    "url": "https://github.com/flathub/com.mojang.Minecraft/blob/master/com.mojang.Minecraft.appdata.xml",
+    "credit": "Flathub contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed.",
+    "icon_url": "https://github.com/flathub/com.mojang.Minecraft/blob/master/com.mojang.Minecraft.png"
+  },
+  "appflowy-bin": {
+    "url": "https://github.com/flathub/io.appflowy.AppFlowy/blob/master/io.appflowy.AppFlowy.appdata.xml",
+    "credit": "AppFlowy developers and Flathub contributors",
+    "metadata_license": "CC-BY-4.0",
+    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
+  },
+  "snoop": {
+    "url": "https://gitlab.gnome.org/philippun1/snoop/-/tree/0.4.2/data",
+    "credit": "Philipp Unger and translators",
+    "metadata_license": "CC0-1.0",
+    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
+  }
+}

@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding='utf-8'?>
+<component type="desktop-application">
+  <id>de.philippun1.Snoop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name translate="no">Snoop</name>
+  <summary>Snoop through your files</summary>
+  <summary xml:lang="uk">Шукайте щось у ваших файлах</summary>
+  <summary xml:lang="ru">Поиск среди файлов</summary>
+  <summary xml:lang="tr">Dosyalarınızı arayın</summary>
+  <summary xml:lang="de">Stöber durch deine Dateien</summary>
+  <description>
+    <p>Snoop lets you search through file contents in a given folder. It also provides a Nautilus extension to quickly search from the context menu.</p>
+    <p xml:lang="uk">'Нишпорка' дає вам змогу шукати щось серед вмісту файлів всередині вказаної теки. Також надає розширення для Файлів (Nautilus), щоб можна було швидко розпочати пошук через контекстне меню.</p>
+    <p xml:lang="ru">'Ищейка' позволяет вам искать что-то в содержимом файла в выбранной папки. Так же предоставляет расширение для Файлов (Nautilus), чтобы быстро начать поиск через контекстное меню.</p>
+    <p xml:lang="tr">Snoop, bir klasördeki dosya içeriklerinde arama yapmanızı sağlar. Ayrıca içerik menüsünden hızlıca arama yapmak için Nautilus eklentisi de sağlar.</p>
+    <p xml:lang="de">Mit Snoop kannst du deine Dateien in einem vorgegebenen Ordner durchsuchen.Zusätzlich bietet es eine Nautilus Extension, um schnell über das Kontext Menü eine Suche zu starten.</p>
+  </description>
+  <launchable type="desktop-id">de.philippun1.Snoop.desktop</launchable>
+  <url type="homepage">https://gitlab.gnome.org/philippun1/snoop/</url>
+  <url type="bugtracker">https://gitlab.gnome.org/philippun1/snoop/-/issues</url>
+  <url type="vcs-browser">https://gitlab.gnome.org/philippun1/snoop/</url>
+  <url type="translate">https://gitlab.gnome.org/philippun1/snoop/-/tree/main/po</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Snoop window</caption>
+      <image>https://gitlab.gnome.org/philippun1/snoop/-/raw/383d8a6fa94ec25ae4a54f1ae04d70d849296f0d/img/window.png</image>
+    </screenshot>
+    <screenshot type="default">
+      <caption>Snoop preferences</caption>
+      <caption xml:lang="uk">Налаштування Нишпорки</caption>
+      <caption xml:lang="ru">Настройки Ищейки</caption>
+      <caption xml:lang="tr">Snoop tercihleri</caption>
+      <caption xml:lang="de">Snoop Einstellungen</caption>
+      <image>https://gitlab.gnome.org/philippun1/snoop/-/raw/383d8a6fa94ec25ae4a54f1ae04d70d849296f0d/img/preferences.png</image>
+    </screenshot>
+    <screenshot type="default">
+      <caption>Snoop preview</caption>
+      <image>https://gitlab.gnome.org/philippun1/snoop/-/raw/383d8a6fa94ec25ae4a54f1ae04d70d849296f0d/img/preview.png</image>
+    </screenshot>
+  </screenshots>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+  <content_rating type="oars-1.1" />
+  <keywords>
+    <keyword translate="no">search</keyword>
+    <keyword translate="no">snoop</keyword>
+  </keywords>
+  <developer_name translate="no">Philipp Unger</developer_name>
+  <update_contact>philipp.unger.1988@gmail.com</update_contact>
+  <icon type="stock">de.philippun1.Snoop</icon>
+  <categories>
+    <category>Utility</category>
+  </categories>
+</component>

@@ -1,0 +1,81 @@
+<?xml version='1.0' encoding='utf-8'?>
+<component type="desktop-application">
+  <id>com.anydesk.Anydesk</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <name>AnyDesk</name>
+  <summary>Connect to a computer remotely</summary>
+  <summary xml:lang="pt_BR">Conectar com um computador remotamente</summary>
+  <summary xml:lang="es">Conéctese a un ordenador de forma remota</summary>
+  <description>
+    <p>AnyDesk ensures secure and reliable remote desktop connections for IT professionals and on-the-go individuals alike.</p>
+    <p xml:lang="pt_BR">A AnyDesk assegura ligações de computador remoto seguras e fiáveis tanto para profissionais de TI como para pessoas em viagem.</p>
+    <p xml:lang="es">Gracias a AnyDesk, contará con conexiones seguras y fiables de escritorio remoto para profesionales informáticos y usuarios en movimiento.</p>
+  </description>
+  <developer id="com.anydesk">
+    <name translate="no">AnyDesk Software GmbH</name>
+  </developer>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <branding>
+    <color type="primary" scheme_preference="light">#fd958d</color>
+    <color type="primary" scheme_preference="dark">#7e211b</color>
+  </branding>
+  <launchable type="desktop-id">anydesk.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main view</caption>
+      <image type="source" width="1256" height="829">https://github.com/flathub/com.anydesk.Anydesk/raw/master/Screenshots/AnyDeskV6_main_view.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Session Recording</caption>
+      <image type="source" width="1021" height="787">https://github.com/flathub/com.anydesk.Anydesk/raw/master/Screenshots/AnyDeskV6_session_recording.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>2FA Setup</caption>
+      <image type="source" width="902" height="652">https://github.com/flathub/com.anydesk.Anydesk/raw/master/Screenshots/AnyDeskV6_2fa_setup.png</image>
+    </screenshot>
+  </screenshots>
+  <url type="homepage">https://www.anydesk.com</url>
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">none</content_attribute>
+    <content_attribute id="violence-fantasy">none</content_attribute>
+    <content_attribute id="violence-realistic">none</content_attribute>
+    <content_attribute id="violence-bloodshed">none</content_attribute>
+    <content_attribute id="violence-sexual">none</content_attribute>
+    <content_attribute id="violence-desecration">none</content_attribute>
+    <content_attribute id="violence-slavery">none</content_attribute>
+    <content_attribute id="violence-worship">none</content_attribute>
+    <content_attribute id="drugs-alcohol">none</content_attribute>
+    <content_attribute id="drugs-narcotics">none</content_attribute>
+    <content_attribute id="drugs-tobacco">none</content_attribute>
+    <content_attribute id="sex-nudity">none</content_attribute>
+    <content_attribute id="sex-themes">none</content_attribute>
+    <content_attribute id="sex-homosexuality">none</content_attribute>
+    <content_attribute id="sex-prostitution">none</content_attribute>
+    <content_attribute id="sex-adultery">none</content_attribute>
+    <content_attribute id="sex-appearance">none</content_attribute>
+    <content_attribute id="language-profanity">none</content_attribute>
+    <content_attribute id="language-humor">none</content_attribute>
+    <content_attribute id="language-discrimination">none</content_attribute>
+    <content_attribute id="social-chat">intense</content_attribute>
+    <content_attribute id="social-info">none</content_attribute>
+    <content_attribute id="social-audio">none</content_attribute>
+    <content_attribute id="social-location">none</content_attribute>
+    <content_attribute id="social-contacts">none</content_attribute>
+    <content_attribute id="money-purchasing">none</content_attribute>
+    <content_attribute id="money-gambling">none</content_attribute>
+  </content_rating>
+  <keywords>
+    <keyword>remote desktop</keyword>
+    <keyword>remote access</keyword>
+    <keyword>secure connection</keyword>
+  </keywords>
+  <icon type="stock">anydesk</icon>
+  <categories>
+    <category>Network</category>
+  </categories>
+</component>
