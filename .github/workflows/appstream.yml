@@ -7,6 +7,7 @@ on:
   push:
     paths:
       - 'generate.py'
+      - 'enrich.py'
       - 'repositories.json'
       - 'policy.json'
       - 'metadata/**'
@@ -28,7 +29,7 @@ jobs:
     steps:
       - name: Install generator
         run: >-
-          pacman -Syu --noconfirm --needed python python-yaml appstream-generator appstream
+          pacman -Syu --noconfirm --needed python python-yaml appstream-generator appstream archlinux-appstream-data
           libheif libjxl openslide poppler-glib imagemagick svt-av1 rav1e ffmpeg git github-cli
       - uses: actions/checkout@v4
       - name: Prepare build user
@@ -94,3 +95,5 @@ jobs:
             work/*/export/hints/
             work/*/export/html/
             work/*/export/logs/
+            work/enrichment/*/catalogs/audit.json
+            work/enrichment/*/catalogs/sources.json

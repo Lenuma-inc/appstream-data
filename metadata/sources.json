@@ -1,40 +1,10 @@
 {
-  "spotify": {
-    "url": "https://github.com/flathub/com.spotify.Client/blob/master/com.spotify.Client.appdata.xml",
-    "credit": "Flathub contributors",
-    "metadata_license": "CC0-1.0",
-    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
-  },
-  "anydesk-bin": {
-    "url": "https://github.com/flathub/com.anydesk.Anydesk/blob/master/com.anydesk.Anydesk.metainfo.xml",
-    "credit": "Flathub contributors",
-    "metadata_license": "CC0-1.0",
-    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
-  },
-  "zotero": {
-    "url": "https://github.com/flathub/org.zotero.Zotero/blob/master/org.zotero.Zotero.appdata.xml",
-    "credit": "Flathub contributors",
-    "metadata_license": "CC0-1.0",
-    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
-  },
   "minecraft-launcher": {
     "url": "https://github.com/flathub/com.mojang.Minecraft/blob/master/com.mojang.Minecraft.appdata.xml",
     "credit": "Flathub contributors",
     "metadata_license": "CC0-1.0",
-    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed.",
+    "changes": "Icon-only supplement for the native launcher; descriptions and screenshots are imported automatically from Flathub using metadata/matches.json.",
     "icon_url": "https://github.com/flathub/com.mojang.Minecraft/blob/master/com.mojang.Minecraft.png"
-  },
-  "appflowy-bin": {
-    "url": "https://github.com/flathub/io.appflowy.AppFlowy/blob/master/io.appflowy.AppFlowy.appdata.xml",
-    "credit": "AppFlowy developers and Flathub contributors",
-    "metadata_license": "CC-BY-4.0",
-    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
-  },
-  "snoop": {
-    "url": "https://gitlab.gnome.org/philippun1/snoop/-/tree/0.4.2/data",
-    "credit": "Philipp Unger and translators",
-    "metadata_license": "CC0-1.0",
-    "changes": "Adapted component ID, desktop launchable, stock icon and categories for the native package; release history omitted. Flatpak-specific support instructions and bug tracker links removed."
   },
   "cadcraft": {
     "url": "https://raw.githubusercontent.com/storytold/cadcraft/e59195edb83fc9176eb3cd2fadf9cb2c4ee0eb8e/packaging/linux/ai.storyteller.cadcraft.metainfo.xml.in",
@@ -86,12 +56,6 @@
     "metadata_license": "CC0-1.0",
     "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
   },
-  "onlyoffice-bin": {
-    "url": "https://raw.githubusercontent.com/flathub/org.onlyoffice.desktopeditors/f88f5d2ce96e387ee0728273bdfa43e3a639b8ac/org.onlyoffice.desktopeditors.metainfo.xml",
-    "credit": "ONLYOFFICE and Flathub contributors",
-    "metadata_license": "CC0-1.0",
-    "changes": "Adapted desktop launchable, stock icon and categories for the native package; release history and Flatpak repository link omitted. Screenshot URLs pinned to upstream commits."
-  },
   "pdfcraft": {
     "url": "https://raw.githubusercontent.com/storytold/pdfcraft/86730ed14466c5388173e32ef5a3ec015e523b9a/packaging/linux/ai.storyteller.pdfcraft.metainfo.xml.in",
     "credit": "Learning Machines LLC and ArtCraft contributors",
@@ -121,5 +85,23 @@
     "credit": "Learning Machines LLC and ArtCraft contributors",
     "metadata_license": "CC0-1.0",
     "changes": "Release history omitted; upstream description, links and screenshots retained. Screenshot URLs pinned to upstream commits."
+  },
+  "spotify-qt": {
+    "url": "https://github.com/kraxarn/spotify-qt/blob/a5eeff4fa0459d507d3f7b8583cf6f5a53c43540/readme.md",
+    "credit": "Upstream project contributors; supplemental description by LunaOS contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Authored native-package metainfo based on upstream documentation; screenshot URLs reference upstream README images and retain upstream media licenses."
+  },
+  "discord-chat-exporter-gui": {
+    "url": "https://github.com/Tyrrrz/DiscordChatExporter/blob/d5f7ad0e5d8bd17b87b086db62b84b2aaa080c0b/Readme.md",
+    "credit": "Upstream project contributors; supplemental description by LunaOS contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Authored native-package metainfo based on upstream documentation; screenshot URLs reference upstream README images and retain upstream media licenses."
+  },
+  "terasology": {
+    "url": "https://terasology.org",
+    "credit": "MovingBlocks and Terasology contributors; supplemental description by LunaOS contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Authored native metainfo based on the official project website; screenshots reference the official gallery and retain upstream media licenses."
   }
 }

@@ -1,0 +1,106 @@
+import copy
+import gzip
+import json
+from pathlib import Path
+import tempfile
+import unittest
+import xml.etree.ElementTree as ET
+
+import enrich
+
+
+def component(description="Short", screenshot=None, name="Example", cid="org.example.App", package="example"):
+    root = ET.Element("component", type="desktop-application")
+    for tag, text in (("id", cid), ("name", name), ("pkgname", package)):
+        ET.SubElement(root, tag).text = text
+    ET.SubElement(root, "launchable", type="desktop-id").text = cid + ".desktop"
+    ET.SubElement(ET.SubElement(root, "description"), "p").text = description
+    if screenshot:
+        image = ET.SubElement(ET.SubElement(ET.SubElement(root, "screenshots"), "screenshot"), "image", type="source")
+        image.text = screenshot
+    return root
+
+
+class EnrichmentTests(unittest.TestCase):
+    def test_native_identity_and_complete_data_are_preserved(self):
+        native = component("Native description. " * 20, "https://native.example/screenshot.png")
+        ET.SubElement(native, "project_license").text = "MIT"
+        before = ET.tostring(native)
+        upstream = component("Different upstream description. " * 30, "https://upstream.example/shot.png", package="flatpak-package")
+        self.assertEqual(enrich.merge_presentation(native, upstream), [])
+        self.assertEqual(ET.tostring(native), before)
+
+    def test_missing_data_is_added_without_replacing_launchers_or_packages(self):
+        native = component()
+        upstream = component("Detailed upstream description. " * 10, "https://upstream.example/shot.png", cid="other.App", package="other-package")
+        self.assertEqual(enrich.merge_presentation(native, upstream), ["description", "screenshots"])
+        self.assertEqual(native.findtext("pkgname"), "example")
+        self.assertEqual(native.findtext("launchable"), "org.example.App.desktop")
+
+    def test_flatpak_instructions_and_thumbnails_are_not_imported(self):
+        upstream = component("Useful portable description. " * 10, "https://example.org/original.png")
+        ET.SubElement(upstream.find("description"), "p").text = "Install a Flatpak permission override."
+        shot = upstream.find(".//screenshot")
+        ET.SubElement(shot, "image", type="thumbnail").text = "https://example.org/thumb.png"
+        data = enrich.presentation(upstream)
+        self.assertNotIn("Flatpak", ET.tostring(data, encoding="unicode"))
+        self.assertEqual(len(data.findall(".//image")), 1)
+
+    def test_invalid_source_urls_and_duplicate_source_images_are_normalized(self):
+        upstream = component(screenshot="https://example.org/one.png")
+        shot = upstream.find(".//screenshot")
+        ET.SubElement(shot, "image", type="source").text = "https://example.org/two.png"
+        ET.SubElement(shot, "image", type="source").text = "${}appstream_screenshot_url"
+        data = enrich.presentation(upstream)
+        self.assertEqual(len(data.findall(".//screenshot")), 2)
+        self.assertTrue(all(len(s.findall("image")) == 1 for s in data.findall(".//screenshot")))
+
+    def test_metainfo_translations_become_catalog_description_sections(self):
+        upstream = component("English description")
+        desc = upstream.find("description")
+        ET.SubElement(desc, "p", **{enrich.LANG: "ru"}).text = "Русское описание"
+        items = ET.SubElement(desc, "ul")
+        ET.SubElement(items, "li").text = "Feature"
+        ET.SubElement(items, "li", **{enrich.LANG: "ru"}).text = "Возможность"
+        data = enrich.presentation(upstream)
+        translated = data.find("description[@{http://www.w3.org/XML/1998/namespace}lang='ru']")
+        self.assertEqual(translated.findtext("p"), "Русское описание")
+        self.assertEqual(translated.findtext("ul/li"), "Возможность")
+        self.assertTrue(all(enrich.LANG not in child.attrib for description in data.findall("description")
+                            for child in description.iter() if child is not description))
+
+    def test_reference_supplement_requires_available_package_and_keeps_native_id(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            extra = ET.Element("components")
+            extra.append(component(package="discord", cid="discord.desktop"))
+            ET.ElementTree(extra).write(directory / "extra.xml")
+            native = ET.Element("components")
+            self.assertEqual(enrich.apply_enrichment(native, "lunaos-repo", set(), set(), directory), [])
+            names = set()
+            result = enrich.apply_enrichment(native, "lunaos-repo", names, {"discord"}, directory)
+            self.assertEqual(len(result), 1)
+            self.assertEqual(native.findtext("component/id"), "discord.desktop")
+            self.assertEqual(names, {"discord"})
+            self.assertEqual(enrich.apply_enrichment(native, "lunaos-repo", names, {"discord"}, directory), [])
+
+    def test_common_suite_homepage_does_not_match_different_apps(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            catalogs = directory / "xml"
+            catalogs.mkdir()
+            native = component(name="Different Editor", cid="different.desktop", package="different-editor")
+            upstream = component("Complete description. " * 20, "https://example.org/shot.png", name="Suite Viewer", cid="org.suite.Viewer")
+            for c in (native, upstream):
+                ET.SubElement(c, "url", type="homepage").text = "https://suite.example.org"
+            for filename, c in ((catalogs / "chaotic-aur.xml.gz", native), (directory / "flathub.xml.gz", upstream)):
+                root = ET.Element("components")
+                root.append(c)
+                filename.write_bytes(gzip.compress(ET.tostring(root)))
+            enrich.import_catalogs(catalogs, directory / "flathub.xml.gz", directory / "output", directory / "no-databases")
+            audit = json.loads((directory / "output/audit.json").read_text())
+            self.assertEqual(audit[0]["status"], "needs-upstream-review")
+
+
+if __name__ == "__main__":
+    unittest.main()

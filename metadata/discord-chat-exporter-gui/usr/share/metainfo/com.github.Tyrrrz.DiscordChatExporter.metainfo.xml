@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<component type="desktop-application">
+  <id>com.github.Tyrrrz.DiscordChatExporter</id>
+  <name>Discord Chat Exporter</name>
+  <summary>Export Discord channel message history</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://github.com/Tyrrrz/DiscordChatExporter</url>
+  <launchable type="desktop-id">discord-chat-exporter-gui.desktop</launchable>
+  <icon type="stock">discord-chat-exporter-gui</icon>
+  <description>
+    <p>Discord Chat Exporter saves message history from Discord channels to files. It supports direct messages, group conversations and server channels, preserving message formatting and rich media in supported export formats.</p>
+    <p>The graphical interface lets you choose channels and configure an export. Exported conversations can be viewed independently of the Discord client.</p>
+  </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Channel selection</caption>
+      <image type="source">https://raw.githubusercontent.com/Tyrrrz/DiscordChatExporter/d5f7ad0e5d8bd17b87b086db62b84b2aaa080c0b/.assets/list.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Exported conversation</caption>
+      <image type="source">https://raw.githubusercontent.com/Tyrrrz/DiscordChatExporter/d5f7ad0e5d8bd17b87b086db62b84b2aaa080c0b/.assets/output.png</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>Network</category>
+    <category>Utility</category>
+  </categories>
+  <content_rating type="oars-1.1" />
+</component>

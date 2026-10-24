@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.terasology.Terasology</id>
+  <name>Terasology</name>
+  <summary>Explore and build in a modular voxel world</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <developer id="org.terasology"><name>MovingBlocks and Terasology contributors</name></developer>
+  <url type="homepage">https://terasology.org</url>
+  <url type="bugtracker">https://github.com/MovingBlocks/Terasology/issues</url>
+  <launchable type="desktop-id">terasology.desktop</launchable>
+  <icon type="stock">terasology</icon>
+  <description>
+    <p>Terasology is an open source voxel game and a platform for experimenting with different kinds of gameplay. Explore generated worlds, build with blocks and combine modules to change the experience.</p>
+    <p>The modular engine supports community content, world generators and gameplay systems. Available modules range from crafting and survival to puzzles and other experimental game modes.</p>
+  </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>A village in a Terasology voxel world</caption>
+      <image type="source">https://terasology.org/images/Quiet_Village.jpg</image>
+    </screenshot>
+    <screenshot>
+      <caption>Water and terrain in Terasology</caption>
+      <image type="source">https://terasology.org/images/Flowing_Water.jpg</image>
+    </screenshot>
+  </screenshots>
+  <categories><category>Game</category><category>Simulation</category></categories>
+  <content_rating type="oars-1.1" />
+</component>

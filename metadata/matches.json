@@ -1,0 +1,9 @@
+{
+  "anydesk-bin": "com.anydesk.Anydesk",
+  "appflowy-bin": "io.appflowy.AppFlowy",
+  "minecraft-launcher": "com.mojang.Minecraft",
+  "onlyoffice-bin": "org.onlyoffice.desktopeditors",
+  "snoop": "de.philippun1.Snoop",
+  "spotify": "com.spotify.Client",
+  "zotero": "org.zotero.Zotero"
+}

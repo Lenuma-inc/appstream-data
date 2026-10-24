@@ -24,6 +24,8 @@ import xml.etree.ElementTree as ET
 
 import yaml
 
+from enrich import apply_enrichment, download_catalog, prepare_enrichment
+
 ROOT = Path(__file__).resolve().parent
 RESOURCE_PREFIXES = (
     "usr/share/applications/", "usr/share/metainfo/", "usr/share/appdata/",
@@ -229,9 +231,11 @@ def resource_package(source, destination, package_name):
     if not overlay.is_dir():
         subprocess.run(command + ["--zstd", "-cf", str(destination), "@" + str(source)], check=True)
         return
-    # Replace packaged metainfo to avoid duplicate IDs and stale launchable names.
-    for pattern in ("usr/share/metainfo/*", "usr/share/appdata/*", "*.metainfo.xml", "*.appdata.xml"):
-        command.extend(["--exclude", pattern, "--exclude", "./" + pattern])
+    # Icon-only overlays must not suppress a package's own metainfo.
+    if any(overlay.glob("usr/share/metainfo/*")) or any(overlay.glob("usr/share/appdata/*")):
+        # Replace packaged metainfo to avoid duplicate IDs and stale launchable names.
+        for pattern in ("usr/share/metainfo/*", "usr/share/appdata/*", "*.metainfo.xml", "*.appdata.xml"):
+            command.extend(["--exclude", pattern, "--exclude", "./" + pattern])
     with tempfile.TemporaryDirectory(prefix="metadata-", dir=destination.parent) as temp:
         filtered = Path(temp) / "resources.tar"
         subprocess.run(command + ["-cf", str(filtered), "@" + str(source)], check=True)
@@ -421,11 +425,16 @@ def unpack_icons(archive_path, destination):
             target.chmod(0o644)
 
 
-def write_catalog(source, destination, priority, package_names, excluded_components=()):
+def write_catalog(source, destination, priority, package_names, excluded_components=(),
+                  repo=None, reference_names=(), enrichment_report=None, enrichment_dir=None):
     with gzip.open(source, "rb") as stream:
         root = ET.parse(stream).getroot()
     if root.tag != "components":
         raise ValueError("Expected an AppStream catalog with <components> root")
+    if repo is not None:
+        applied = apply_enrichment(root, repo, package_names, reference_names, enrichment_dir)
+        if enrichment_report is not None:
+            enrichment_report.extend(applied)
     origin = token(root.get("origin", ""))
     # The generator requires a media base even though this deployment uses cached
     # icons and original upstream screenshot URLs. Do not ship the unused base.
@@ -534,6 +543,9 @@ def package_repo(repo, config, args):
         raise ValueError("Inputs changed since the last generation; run generate again")
     if manifest["policy"] != args.policy_data:
         raise ValueError("Policy changed; run sync and generate again before packaging")
+    project_urls = {p["name"]: p["url"][0] for p in manifest["packages"] if p.get("url")}
+    enrichment_dir = prepare_enrichment(repo, catalogs[0], args.work / "enrichment" / repo,
+                                        args.enrichment_catalog, args.work / "reference", project_urls)
     pkgname = config["package"]
     output = args.output / pkgname
     output.mkdir(parents=True, exist_ok=True)
@@ -542,9 +554,20 @@ def package_repo(repo, config, args):
         share = stage / "usr/share"
         catalog = share / "swcatalog/xml" / f"{repo}.xml.gz"
         names = {p["name"] for p in manifest["packages"]}
+        reference_names = set()
+        if repo == "lunaos-repo":
+            for database in sorted((args.work / "reference").glob("*.db")):
+                reference_names.update(database_names(database, manifest["architecture"]))
+            reference_names = {
+                name for name in reference_names
+                if name in args.policy_data["keep_packages"] or not any(
+                    fnmatch.fnmatchcase(name, pattern) for pattern in args.policy_data["exclude_packages"])
+            }
+        enrichment_report = []
         try:
             origin, count = write_catalog(catalogs[0], catalog, config["priority"], names,
-                                          args.policy_data["exclude_components"])
+                                          args.policy_data["exclude_components"], repo,
+                                          reference_names, enrichment_report, enrichment_dir)
         finally:
             report = catalog.with_suffix(".validation.yaml")
             if report.is_file():
@@ -568,11 +591,25 @@ def package_repo(repo, config, args):
             if icon.get("scale", "1") != "1":
                 size += "@" + icon.get("scale")
             filename = icon.text or ""
+            if PurePosixPath(filename).name == filename and not (icon_root / size / filename).is_file():
+                supplemental_icon = enrichment_dir / "icons" / size / filename
+                if supplemental_icon.is_file():
+                    (icon_root / size).mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(supplemental_icon, icon_root / size / filename)
             if PurePosixPath(filename).name != filename or not (icon_root / size / filename).is_file():
                 layout = [str(p.relative_to(workspace)) for p in (workspace / "export").rglob("*") if p.is_file()]
                 raise ValueError(f"Missing cached icon: {size}/{filename}; "
                                  f"icon archives={archives}; exported files={layout}")
         manifest.update({"origin": origin, "components": count, "priority": config["priority"]})
+        enrichment_sources = enrichment_dir / "sources.json"
+        if enrichment_sources.is_file():
+            sources = json.loads(enrichment_sources.read_text())
+            manifest["catalog_enrichment"] = {
+                "catalog_sha256": sources["catalog_sha256"],
+                "components": {f"{item['repository']}/{item['id']}":
+                               sources["components"].get(f"{item['repository']}/{item['id']}", {})
+                               for item in enrichment_report},
+            }
         manifest["generator"] = stamp["generator"]
         doc = share / "doc" / pkgname
         doc.mkdir(parents=True)
@@ -586,7 +623,7 @@ def package_repo(repo, config, args):
             "does not relicense them. Package source URLs and declared package licenses\n"
             "are recorded in /usr/share/doc/" + pkgname + "/manifest.json.\n"
             "Supplemental metadata sources, credits, changes and licenses are recorded\n"
-            "in the metadata_overrides section of the same manifest.\n"
+            "in the metadata_overrides and catalog_enrichment sections of the same manifest.\n"
         )
         filename = f"{pkgname}-{args.version}.tar.gz"
         source_archive(stage, output / filename, f"{pkgname}-{args.version}")
@@ -602,6 +639,8 @@ def main():
     parser.add_argument("--explain", action="store_true", help="List packages hidden by the policy")
     parser.add_argument("--work", type=Path, default=ROOT / "work")
     parser.add_argument("--output", type=Path, default=ROOT / "dist")
+    parser.add_argument("--enrichment-catalog", type=Path,
+                        help="Use a local upstream AppStream snapshot instead of downloading it")
     parser.add_argument("--database-dir", type=Path, default=Path("/var/lib/pacman/sync"),
                         help="Local .files databases for offline plan")
     parser.add_argument("--jobs", type=int, default=4, help="Concurrent downloads")
@@ -634,6 +673,12 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if args.command in ("sync", "all"):
             args.available = prepare_context(config, args, architecture, download=True)
+        if args.command in ("package", "all"):
+            if args.enrichment_catalog is None:
+                args.enrichment_catalog = args.work / "enrichment/flathub.xml.gz"
+                download_catalog(args.enrichment_catalog)
+            else:
+                args.enrichment_catalog = args.enrichment_catalog.resolve()
         for repo in repos:
             settings = config["repositories"][repo]
             if args.command in ("sync", "all"):
