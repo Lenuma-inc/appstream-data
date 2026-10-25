@@ -1,8 +1,9 @@
-`enrich.py` downloads upstream AppStream data during catalog packaging. It fills
-missing descriptions and screenshots while preserving native package names,
-desktop launchers, icons, licenses and release histories. Generated snapshots,
-source attribution and audit reports are stored in `work/enrichment/` and uploaded
-as CI artifacts; they are not maintained in this directory.
+`enrich.py` downloads AppStream catalogs from Flathub, Debian, ALT Sisyphus and
+Fedora Rawhide, then checks upstream project pages for missing descriptions and
+screenshots. It preserves native package names, desktop launchers, icons, licenses
+and release histories. Generated snapshots, source attribution and audit reports
+are stored in `work/enrichment/` and uploaded as CI artifacts; they are not
+maintained in this directory.
 
 `matches.json` records explicit native-package-to-Flathub IDs where names or
 desktop IDs differ. These small mappings replace copied Flathub metainfo files
@@ -14,27 +15,37 @@ spotify-qt, Discord Chat Exporter, Terasology and the Minecraft launcher icon.
 `sources.json` records their provenance and the licenses declared for the
 supplemental metadata. Referenced images retain their upstream licenses.
 
-`screenshot_sources.json` contains reviewed upstream image references for apps
-whose AppStream data has no screenshots. These entries add only images and
-captions, preserving the native descriptions, licenses and launchers. Mirrored
+`screenshot_sources.json` contains reviewed upstream source references for apps
+whose AppStream catalogs have no screenshots or where a reviewed source is more
+accurate than the project gallery. Catalog screenshots take precedence; reviewed
+images then take precedence over generic page discovery. These entries add only
+images and captions, preserving native descriptions, licenses and launchers. A
+reviewed Steam app URL identifies the exact app while screenshots are fetched and
+validated from Steam automatically, including for non-game software. Mirrored
 Flathub screenshots can also replace moving GitHub-branch URLs, avoiding links
-broken by branch renames.
+broken by branch renames. For itch.io galleries, `exclude_images` can omit a cover
+image or logo while leaving the remaining screenshots to automatic discovery.
 
-To inspect all installed catalogs without downloading the source again:
+ALT metadata is read from the `appstream-data-desktop` RPM, and Fedora metadata
+from Fedora's `appstream-data` RPM; neither package is installed. Their current
+RPMs are resolved from the official package indexes and the extracted catalogs
+are recorded in source reports.
+
+To package existing generator exports using local upstream snapshots:
 
 ```sh
-python enrich.py --flathub-catalog work/enrichment/flathub.xml.gz
-```
-
-To package existing generator exports using a local upstream snapshot:
-
-```sh
-python generate.py package --enrichment-catalog work/enrichment/flathub.xml.gz
+python generate.py package --enrichment-catalog work/enrichment/sources/flathub.xml.gz \
+  --enrichment-extra-catalog work/enrichment/sources/debian-main.xml.gz \
+  --enrichment-extra-catalog work/enrichment/sources/debian-contrib.xml.gz \
+  --enrichment-extra-catalog work/enrichment/sources/debian-non-free.xml.gz \
+  --enrichment-extra-catalog work/enrichment/sources/altlinux-sisyphus.xml.gz \
+  --enrichment-extra-catalog work/enrichment/sources/fedora-rawhide.xml.gz
 ```
 
 Ambiguous identities and sources with no additional data are recorded in
-`audit.json`. A missing match is not permission to copy another application's
-screenshots. Reference packages from Arch are added to the LunaOS catalog only
+`audit.json`. Source catalog status is in
+`work/enrichment/sources/status.json`. A missing match is not permission to copy
+another application's screenshots. Reference packages from Arch are added to the LunaOS catalog only
 while present in the current reference databases; Arch-owned catalog files are
 not replaced. Pamac uses the repository order from pacman.conf, so LunaOS should
 precede Arch repositories, as in the LunaOS default configuration.

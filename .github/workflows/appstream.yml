@@ -8,6 +8,8 @@ on:
     paths:
       - 'generate.py'
       - 'enrich.py'
+      - 'catalog_sources.json'
+      - 'tests/**'
       - 'repositories.json'
       - 'policy.json'
       - 'metadata/**'
@@ -29,7 +31,7 @@ jobs:
     steps:
       - name: Install generator
         run: >-
-          pacman -Syu --noconfirm --needed python python-yaml appstream-generator appstream archlinux-appstream-data
+          pacman -Syu --noconfirm --needed python python-yaml python-pillow appstream-generator appstream archlinux-appstream-data
           libheif libjxl openslide poppler-glib imagemagick svt-av1 rav1e ffmpeg git github-cli
       - uses: actions/checkout@v4
       - name: Prepare build user
@@ -38,6 +40,8 @@ jobs:
           chown -R builder:builder "$GITHUB_WORKSPACE"
       - name: Set catalog version
         run: runuser -u builder -- python update-version.py
+      - name: Test enrichment and visibility rules
+        run: runuser -u builder -- python -m unittest discover -s tests
       - uses: actions/cache@v4
         with:
           path: work
@@ -97,3 +101,5 @@ jobs:
             work/*/export/logs/
             work/enrichment/*/catalogs/audit.json
             work/enrichment/*/catalogs/sources.json
+            work/enrichment/*/catalogs/quality.json
+            work/enrichment/sources/status.json

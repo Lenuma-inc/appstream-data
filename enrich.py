@@ -8,16 +8,305 @@ Generated catalogs and audit reports belong in work/, not in metadata/.
 import argparse
 from collections import defaultdict
 import copy
+import fnmatch
 import gzip
 import hashlib
 import json
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import tarfile
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 import urllib.request
 import xml.etree.ElementTree as ET
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import hashlib
+from html import unescape
+from html.parser import HTMLParser
+import io
+import json
+from pathlib import Path
+import re
+import threading
+import time
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, urljoin, urlsplit
+import urllib.request
+
+
+def normalized(value):
+    return re.sub(r"[^a-z0-9]", "", value.lower())
+
+
+class ProjectPage(HTMLParser):
+    """Only itch.io's project description/gallery; never comment attachments."""
+    def __init__(self, excluded_images=()):
+        super().__init__()
+        self.excluded_images = set(excluded_images)
+        self.description_depth = 0
+        self.capture = None
+        self.text = []
+        self.paragraphs = []
+        self.images = []
+        self.anchor = None
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "div":
+            if self.description_depth:
+                self.description_depth += 1
+            elif "formatted_description" in attrs.get("class", "").split():
+                self.description_depth = 1
+        if self.description_depth and tag in ("p", "li"):
+            self.capture, self.text = tag, []
+        if tag == "a":
+            self.anchor = attrs.get("href") if attrs.get("data-image_lightbox") == "true" else None
+        if tag == "img" and "screenshot" in attrs.get("class", "").split() and attrs.get("data-screenshot_id"):
+            if self.anchor and self.anchor not in self.excluded_images:
+                self.images.append((self.anchor, "Application interface"))
+
+    def handle_endtag(self, tag):
+        if tag == self.capture:
+            paragraph = " ".join("".join(self.text).split())
+            if len(paragraph) >= 60 and paragraph not in self.paragraphs:
+                self.paragraphs.append(paragraph)
+            self.capture = None
+        if tag == "div" and self.description_depth:
+            self.description_depth -= 1
+        if tag == "a":
+            self.anchor = None
+
+    def handle_data(self, data):
+        if self.capture:
+            self.text.append(data)
+
+
+class ReadmeImages(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.images = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "img" and attrs.get("src"):
+            self.images.append((attrs["src"], attrs.get("alt", "")))
+
+
+def readme_presentation(text):
+    images = [(url, alt) for alt, url in re.findall(r'!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)', text)]
+    html = ReadmeImages()
+    html.feed(text)
+    images.extend(html.images)
+    screenshots = []
+    for url, alt in images:
+        filename = Path(urlsplit(url).path).name
+        label = filename + " " + alt
+        if re.search(r"logo|badge|banner|shield|avatar|sponsor|donat", label, re.I):
+            continue
+        if re.search(r"screenshot|screen[-_ ]?shot|preview|overview|interface|main[-_ ]?window|(?:^|[\W_])ui(?:[\W_]|$)", label, re.I):
+            screenshots.append((url, alt or "Application interface"))
+    text = re.sub(r"```.*?```", "", text, flags=re.S)
+    paragraphs = []
+    for paragraph in re.split(r"\n\s*\n", text):
+        paragraph = paragraph.strip()
+        if not paragraph or paragraph.startswith(("#", "[!", "![", "<", ">", "|", "- ", "* ")):
+            continue
+        if re.match(r"(?:install|download|build|license|copyright|sponsor|donate|sudo|curl|wget)\b", paragraph, re.I):
+            continue
+        paragraph = re.sub(r"!?\[([^\]]*)\]\([^)]+\)", r"\1", paragraph)
+        paragraph = unescape(re.sub(r"<[^>]+>|[`*_]", "", paragraph))
+        paragraph = " ".join(paragraph.split())
+        if 120 <= len(paragraph) <= 1800 and paragraph not in paragraphs:
+            paragraphs.append(paragraph)
+        if len(paragraphs) == 2:
+            break
+    return paragraphs, screenshots
+
+
+class UpstreamResolver:
+    def __init__(self, cache, workers=6):
+        self.cache = Path(cache)
+        self.cache.mkdir(parents=True, exist_ok=True)
+        self.workers = workers
+        self.lock = threading.Lock()
+        self.url_locks = {}
+        self.results = {}
+        self.screenshot_sources = json.loads(
+            (Path(__file__).resolve().parent / "metadata/screenshot_sources.json").read_text())
+
+    def fetch(self, url, limit=512 * 1024):
+        if urlsplit(url).scheme != "https":
+            return None
+        digest = hashlib.sha256(url.encode()).hexdigest()
+        with self.lock:
+            lock = self.url_locks.setdefault(digest, threading.Lock())
+        with lock:
+            body, info = self.cache / digest, self.cache / (digest + ".json")
+            if info.is_file():
+                metadata = json.loads(info.read_text())
+                ttl = 86400 if metadata.get("ok") else 14400
+                if time.time() - metadata["time"] < ttl:
+                    return body.read_bytes() if metadata.get("ok") and body.is_file() else None
+            metadata = {"url": url, "time": time.time(), "ok": False}
+            try:
+                request = urllib.request.Request(url, headers={"User-Agent": "LunaOS-AppStream/1"})
+                with urllib.request.urlopen(request, timeout=15) as stream:
+                    data = stream.read(limit + 1)
+                if len(data) > limit:
+                    raise ValueError("Source exceeds size limit")
+                body.write_bytes(data)
+                metadata["ok"] = True
+                return data
+            except (HTTPError, URLError, OSError, ValueError) as error:
+                metadata["error"] = str(error)
+                return None
+            finally:
+                info.write_text(json.dumps(metadata) + "\n")
+
+    def image(self, url, caption):
+        data = self.fetch(url, limit=12 * 1024 * 1024)
+        if data is None:
+            return None
+        try:
+            from PIL import Image
+            with Image.open(io.BytesIO(data)) as image:
+                width, height = image.size
+                image.verify()
+            if width < 480 or height < 270:
+                return None
+            return {"url": url, "caption": caption, "width": width, "height": height}
+        except (OSError, ValueError, Image.DecompressionBombError):
+            return None
+
+    def supports(self, component, url):
+        parsed = urlsplit(url)
+        host = parsed.hostname or ""
+        if parsed.scheme != "https":
+            return False
+        if host not in ("github.com", "gitlab.com") and not host.endswith(".itch.io"):
+            return component.find("categories/category[.='Game']") is not None
+        parts = parsed.path.strip("/").split("/")
+        if host in ("github.com", "gitlab.com") and len(parts) < 2:
+            return False
+        project = parts[1] if host == "github.com" else parts[-1]
+        if not project:
+            return False
+        identity = normalized(project.removesuffix(".git"))
+        names = [normalized(c.text or "") for c in component.findall("name")]
+        package = re.sub(r"-(?:bin|git|appimage)$", "", component.findtext("pkgname", ""))
+        names.append(normalized(package))
+        return any(identity == name or (len(identity) >= 6 and name.startswith(identity)) for name in names)
+
+    def steam(self, component, project_url, steam_url=None):
+        # A reviewed Steam URL is an explicit identity mapping, so it is safe
+        # for non-game software too. Search by title only for games and keep
+        # the stricter website corroboration on that unreviewed path.
+        direct_url = steam_url or project_url
+        direct = re.search(r"store\.steampowered\.com/app/(\d+)", direct_url)
+        if not direct and component.find("categories/category[.='Game']") is None:
+            return None
+        names = [e.text or "" for e in component.findall("name") if not e.get("{http://www.w3.org/XML/1998/namespace}lang")]
+        if not names or len(names[0]) < 4:
+            return None
+        if direct:
+            ids = [direct[1]]
+        else:
+            query = urlencode({"term": names[0], "l": "english", "cc": "us"})
+            content = self.fetch("https://store.steampowered.com/api/storesearch/?" + query)
+            if content is None:
+                return None
+            candidates = json.loads(content).get("items", [])
+            ids = [str(c["id"]) for c in candidates if normalized(c.get("name", "")) in {normalized(n) for n in names}]
+            if len(ids) != 1:
+                return None
+        content = self.fetch("https://store.steampowered.com/api/appdetails?appids=" + ids[0])
+        if content is None:
+            return None
+        details = json.loads(content).get(ids[0], {})
+        if not details.get("success"):
+            return None
+        data = details["data"]
+        if not direct:
+            # Same titles can refer to unrelated games. Require the publisher's
+            # website to corroborate the native package's project URL as well.
+            def identity(url):
+                p = urlsplit(url)
+                return ((p.hostname or "").removeprefix("www.").lower(), p.path.rstrip("/").lower())
+            if not data.get("website") or identity(data["website"]) != identity(project_url):
+                return None
+        images = []
+        for screenshot in data.get("screenshots", [])[:4]:
+            image = self.image(screenshot["path_full"], data.get("name", names[0]) + " screenshot")
+            if image:
+                images.append(image)
+        if not images:
+            return None
+        return {"status": "found", "url": "https://store.steampowered.com/app/" + ids[0] + "/",
+                "project_url": project_url, "paragraphs": [], "images": images}
+
+    def resolve(self, component, url):
+        package = component.findtext("pkgname", "")
+        source = self.screenshot_sources.get(package, {})
+        steam_url = source.get("url", "")
+        has_steam_source = bool(re.search(r"store\.steampowered\.com/app/\d+", steam_url))
+        if not self.supports(component, url) and not has_steam_source:
+            return {"status": "no-supported-upstream", "url": url}
+        parsed = urlsplit(url)
+        source_url, paragraphs, candidates = url, [], []
+        if (parsed.hostname or "").endswith(".itch.io"):
+            content = self.fetch(url)
+            if content:
+                package = component.findtext("pkgname", "")
+                exclusions = self.screenshot_sources.get(package, {}).get("exclude_images", [])
+                page = ProjectPage(exclusions)
+                page.feed(content.decode("utf-8", errors="replace"))
+                paragraphs, candidates = page.paragraphs[:6], page.images
+        elif parsed.hostname in ("github.com", "gitlab.com"):
+            parts = parsed.path.strip("/").split("/")
+            if parsed.hostname == "github.com":
+                base = f"https://raw.githubusercontent.com/{parts[0]}/{parts[1].removesuffix('.git')}/HEAD/"
+            else:
+                base = url.rstrip("/").removesuffix(".git") + "/-/raw/HEAD/"
+            for filename in ("README.md", "readme.md", "README.rst"):
+                source_url = base + filename
+                content = self.fetch(source_url)
+                if content:
+                    paragraphs, candidates = readme_presentation(content.decode("utf-8", errors="replace"))
+                    candidates = [(urljoin(base, image), caption) for image, caption in candidates]
+                    break
+        images, seen = [], set()
+        for candidate, caption in candidates:
+            candidate = urljoin(url, candidate)
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            image = self.image(candidate, caption)
+            if image:
+                images.append(image)
+            if len(images) == 4:
+                break
+        if not images:
+            steam = self.steam(component, url, steam_url if has_steam_source else None)
+            if steam:
+                steam["paragraphs"] = paragraphs
+                return steam
+        return {"status": "found" if images or paragraphs else "upstream-has-no-presentation-data",
+                "url": source_url, "project_url": url, "paragraphs": paragraphs, "images": images}
+
+    def resolve_many(self, jobs):
+        pending = {key: value for key, value in jobs.items() if key not in self.results}
+        with ThreadPoolExecutor(max_workers=self.workers) as pool:
+            futures = {pool.submit(self.resolve, component, url): key for key, (component, url) in pending.items()}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    self.results[key] = future.result()
+                except Exception as error:
+                    self.results[key] = {"status": "upstream-check-failed", "error": str(error)}
+        return {key: self.results[key] for key in jobs}
+
 
 ROOT = Path(__file__).resolve().parent
 LANG = "{http://www.w3.org/XML/1998/namespace}lang"
@@ -96,6 +385,8 @@ def presentation(component):
                         if image.tag == "video" or image.get("type", "source") != "source":
                             screenshot.remove(image)
                         elif not (image.text or "").strip().startswith(("https://", "http://")):
+                            screenshot.remove(image)
+                        elif re.search(r"(?:^|[/_-])(?:banner|logo|icon|badge)(?:[/_.-]|$)", urlsplit(image.text).path, re.I):
                             screenshot.remove(image)
                         else:
                             image.text = image.text.strip()
@@ -205,8 +496,36 @@ def apply_enrichment(root, repo, package_names, reference_names=(), directory=No
 
 
 def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/lib/pacman/sync"),
-                    icon_dir=None, project_urls=None):
-    flatpak = ET.fromstring(gzip.decompress(flathub_path.read_bytes()))
+                    icon_dir=None, project_urls=None, upstream_resolver=None, additional_catalogs=()):
+    catalog_components, component_sources, catalog_sources = {}, {}, []
+    for index, source_path in enumerate([flathub_path, *additional_catalogs]):
+        payload = source_path.read_bytes()
+        root = ET.fromstring(gzip.decompress(payload) if payload.startswith(b"\x1f\x8b") else payload)
+        base = root.get("media_baseurl", "")
+        origin = root.get("origin", "flatpak" if index == 0 else source_path.name.removesuffix(".xml.gz").removesuffix(".xml"))
+        source_url = FLATHUB_URL if index == 0 else "https://appstream.debian.org/"
+        if origin.startswith("debian-sid-"):
+            source_url = f"https://appstream.debian.org/data/sid/{origin.removeprefix('debian-sid-')}/Components-amd64.yml.gz"
+        provenance = source_path.with_name(source_path.name + ".source.json")
+        if provenance.is_file():
+            source_info = json.loads(provenance.read_text())
+            source_url = source_info.get("archive_url", source_info["url"])
+        catalog_sources.append({"origin": origin, "url": source_url, "sha256": hashlib.sha256(payload).hexdigest()})
+        for component in root.findall("component"):
+            if component.get("type") not in ("desktop-application", "desktop"):
+                continue
+            for image in component.findall(".//image"):
+                if base and image.text and not image.text.startswith(("https://", "http://")):
+                    image.text = urljoin(base.rstrip("/") + "/", image.text)
+            cid = component.findtext("id", "")
+            key = normalize(cid)
+            if key in catalog_components:
+                existing = catalog_components[key]
+                if merge_presentation(existing, component):
+                    component_sources[existing.findtext("id")]["additional_sources"].append(source_url)
+            else:
+                catalog_components[key] = component
+                component_sources[cid] = {"catalog_url": source_url, "origin": origin, "additional_sources": []}
     indexes = {key: defaultdict(dict) for key in ("id", "desktop", "name", "url")}
     native_urls = package_urls(database_dir)
     native_urls.update(project_urls or {})
@@ -216,8 +535,9 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
     explicit_matches = json.loads(matches_path.read_text()) if matches_path.is_file() else {}
     screenshots_path = ROOT / "metadata/screenshot_sources.json"
     screenshot_sources = json.loads(screenshots_path.read_text()) if screenshots_path.is_file() else {}
-    for component in flatpak:
-        if component.get("type") != "desktop-application":
+    policy = json.loads((ROOT / "policy.json").read_text())
+    for component in catalog_components.values():
+        if component.get("type") not in ("desktop-application", "desktop"):
             continue
         cid = component.findtext("id", "")
         indexes["id"][normalize(cid)][cid] = component
@@ -241,14 +561,44 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
         catalog = ET.fromstring(gzip.decompress(path.read_bytes()))
         origin = catalog.get("origin", "")
         imported = ET.Element("components", version="1.0")
+        jobs = {}
+        if upstream_resolver is not None:
+            for native in catalog.findall("component"):
+                name, cid = native.findtext("pkgname"), native.findtext("id", "")
+                if native.get("type") != "desktop-application" or not name or not missing_fields(native):
+                    continue
+                if name in explicit_matches or (ROOT / "metadata" / name / "usr/share/metainfo").is_dir():
+                    continue
+                if name not in policy["keep_packages"] and any(fnmatch.fnmatchcase(name, p) for p in policy["exclude_packages"]):
+                    continue
+                if any(fnmatch.fnmatchcase(cid, p) for p in policy["exclude_components"]):
+                    continue
+                exact = indexes["id"].get(normalize(cid), {})
+                if len(exact) == 1:
+                    proposed = copy.deepcopy(native)
+                    merge_presentation(proposed, next(iter(exact.values())))
+                    if not missing_fields(proposed):
+                        continue
+                url = native.findtext("url[@type='homepage']") or native_urls.get(name, "")
+                has_reviewed_steam = bool(re.search(
+                    r"store\.steampowered\.com/app/\d+",
+                    screenshot_sources.get(name, {}).get("url", "")))
+                if upstream_resolver.supports(native, url) or has_reviewed_steam:
+                    jobs[cid] = (native, url)
+            print(f"{repo}: checking {len(jobs)} upstream projects for missing presentation data", flush=True)
+        upstream_results = upstream_resolver.resolve_many(jobs) if jobs else {}
         for native in catalog.findall("component"):
             if native.get("type") != "desktop-application" or not native.findtext("pkgname"):
                 continue
             missing = missing_fields(native)
             volatile = volatile_screenshots(native)
-            if not missing and not volatile:
-                continue
             name, cid = native.findtext("pkgname"), native.findtext("id", "")
+            if (name not in policy["keep_packages"] and any(fnmatch.fnmatchcase(name, p) for p in policy["exclude_packages"])) or any(fnmatch.fnmatchcase(cid, p) for p in policy["exclude_components"]):
+                audit.append({"repository": repo, "package": name, "id": cid, "missing": missing, "status": "excluded-by-policy"})
+                continue
+            if not missing and not volatile:
+                audit.append({"repository": repo, "package": name, "id": cid, "missing": [], "status": "complete", "remaining": []})
+                continue
             local_metadata = sorted((ROOT / "metadata" / name / "usr/share/metainfo").glob("*.xml"))
             candidates = dict(indexes["id"].get(normalize(cid), {}))
             for launchable in native.findall("launchable"):
@@ -287,9 +637,14 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 local = ET.parse(local_metadata[0]).getroot()
                 candidates = {local.findtext("id", cid): local}
                 reason = "reviewed-native-metainfo"
-            if name in screenshot_sources and not has_screenshots(native):
+            discovered = upstream_results.get(cid, {})
+            if (name in screenshot_sources and screenshot_sources[name].get("images") and
+                    not has_screenshots(native) and
+                    not any(has_screenshots(candidate) for candidate in candidates.values())):
                 source = screenshot_sources[name]
                 local = copy.deepcopy(native)
+                if candidates:
+                    merge_presentation(local, next(iter(candidates.values())))
                 for old in local.findall("screenshots"):
                     local.remove(old)
                 screenshots = ET.SubElement(local, "screenshots")
@@ -300,6 +655,26 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 candidates = {cid: local}
                 reason = "reviewed-upstream-screenshots"
             record = {"repository": repo, "package": name, "id": cid, "missing": missing}
+            if discovered:
+                record["upstream_check"] = {key: value for key, value in discovered.items() if key not in ("paragraphs", "images")}
+            if discovered.get("status") == "found":
+                # First retain the catalog match, then fill its remaining gaps
+                # from the package's own project rather than another app's data.
+                local = copy.deepcopy(native)
+                if len(candidates) == 1:
+                    merge_presentation(local, next(iter(candidates.values())))
+                found = ET.Element("component", type="desktop-application")
+                description = ET.SubElement(found, "description")
+                for paragraph in discovered["paragraphs"]:
+                    ET.SubElement(description, "p").text = paragraph
+                screenshots = ET.SubElement(found, "screenshots")
+                for index, image in enumerate(discovered["images"]):
+                    shot = ET.SubElement(screenshots, "screenshot", **({"type": "default"} if index == 0 else {}))
+                    ET.SubElement(shot, "caption").text = image["caption"][:120]
+                    ET.SubElement(shot, "image", type="source", width=str(image["width"]), height=str(image["height"])).text = image["url"]
+                if merge_presentation(local, found):
+                    candidates = {cid: local}
+                    reason = "verified-project-presentation"
             if len(candidates) != 1:
                 record["status"] = "needs-upstream-review"
                 audit.append(record)
@@ -364,41 +739,153 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 "url": f"https://flathub.org/apps/{flat_id.removesuffix('.desktop')}",
                 "catalog_url": FLATHUB_URL, "match": reason, "fields": changed,
                 "licenses": "Upstream metadata and media retain their respective licenses."}
+            if flat_id in component_sources:
+                provider = component_sources[flat_id]
+                sources[f"{repo}/{cid}"].update(provider)
+                if provider["origin"] != "flatpak":
+                    sources[f"{repo}/{cid}"]["url"] = provider["catalog_url"]
             if reason == "reviewed-native-metainfo":
                 sources[f"{repo}/{cid}"].update(local_sources.get(name, {}))
                 sources[f"{repo}/{cid}"].pop("catalog_url", None)
             elif reason == "reviewed-upstream-screenshots":
                 sources[f"{repo}/{cid}"].update({key: value for key, value in screenshot_sources[name].items() if key != "images"})
                 sources[f"{repo}/{cid}"].pop("catalog_url", None)
+            elif reason == "verified-project-presentation":
+                sources[f"{repo}/{cid}"].update(url=discovered["url"], project_url=discovered["project_url"],
+                                               credit="Upstream project contributors")
+                sources[f"{repo}/{cid}"].pop("catalog_url", None)
         ET.indent(imported, space="  ")
         ET.ElementTree(imported).write(output / f"{repo}.xml", encoding="utf-8", xml_declaration=True)
-    sources_doc = {"catalog_sha256": hashlib.sha256(flathub_path.read_bytes()).hexdigest(), "components": sources}
+    sources_doc = {"catalog_sha256": hashlib.sha256(flathub_path.read_bytes()).hexdigest(), "catalogs": catalog_sources, "components": sources}
     (output / "sources.json").write_text(json.dumps(sources_doc, indent=2) + "\n")
     (output / "audit.json").write_text(json.dumps(audit, indent=2) + "\n")
+    summary = {"components": len(audit), "statuses": {}, "remaining": {}}
     counts = defaultdict(int)
     for record in audit:
         counts[record["status"]] += 1
+        if record["status"] != "excluded-by-policy":
+            for field in record.get("remaining", record["missing"]):
+                summary["remaining"][field] = summary["remaining"].get(field, 0) + 1
+    summary["statuses"] = dict(counts)
+    (output / "quality.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(dict(counts), indent=2))
 
 
-def download_catalog(destination):
-    """Keep incomplete network downloads out of the last usable snapshot."""
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_suffix(destination.suffix + ".part")
-    try:
-        request = urllib.request.Request(FLATHUB_URL, headers={"User-Agent": "LunaOS-AppStream/1"})
-        with urllib.request.urlopen(request, timeout=120) as source, temporary.open("wb") as out:
-            shutil.copyfileobj(source, out)
-        root = ET.fromstring(gzip.decompress(temporary.read_bytes()))
-        if root.tag != "components" or root.find("component") is None:
-            raise ValueError("Downloaded upstream catalog is empty or invalid")
-        temporary.replace(destination)
-    finally:
-        temporary.unlink(missing_ok=True)
+def rpm_catalog_member(names):
+    candidates = [name for name in names if
+                  ("/swcatalog/xml/" in "/" + name or "/app-info/xmls/" in "/" + name)
+                  and name.endswith((".xml", ".xml.gz"))]
+    if len(candidates) != 1:
+        raise ValueError(f"Expected one RPM AppStream catalog, found {candidates}")
+    return candidates[0]
+
+
+def rpm_catalog_url(source, listing):
+    pattern = re.escape(source["package_prefix"]) + r"[A-Za-z0-9_.+~%-]+\.noarch\.rpm"
+    names = set(re.findall(pattern, listing))
+    if len(names) != 1:
+        raise ValueError(f"Expected one current AppStream RPM, found {sorted(names)}")
+    return urljoin(source["url"], names.pop())
+
+
+def html_links(document):
+    return re.findall(r"href=[\"']([^\"']+)[\"']", document, re.I)
+
+
+def fedora_rpm_url(source, fetch_listing):
+    root = source["url"].rstrip("/") + "/"
+    versions = sorted({name.strip("/") for name in html_links(fetch_listing(root))
+                       if re.fullmatch(r"\d+/?", name)})
+    if not versions:
+        raise ValueError("No Fedora appstream-data builds found in Koji")
+    version = versions[-1]
+    version_url = urljoin(root, version + "/")
+    releases = []
+    for name in html_links(fetch_listing(version_url)):
+        match = re.fullmatch(r"(\d+)\.fc(\d+)/?", name)
+        if match:
+            releases.append((int(match[2]), int(match[1]), match[1] + ".fc" + match[2]))
+    if not releases:
+        raise ValueError(f"No Rawhide build found for Fedora appstream-data {version}")
+    release = max(releases)[2]
+    arch_url = urljoin(version_url, release + "/noarch/")
+    expected = rf"appstream-data-{re.escape(version)}-{re.escape(release)}\.noarch\.rpm"
+    rpm_names = sorted({name for name in html_links(fetch_listing(arch_url))
+                        if re.fullmatch(expected, name)})
+    if len(rpm_names) != 1:
+        raise ValueError(f"Expected one Fedora Rawhide appstream-data RPM, found {rpm_names}")
+    return urljoin(arch_url, rpm_names[0])
+
+
+def download_catalogs(directory):
+    """Refresh the configured distribution databases, retaining optional cached sources."""
+    directory.mkdir(parents=True, exist_ok=True)
+    loaded, report = [], []
+    for source in json.loads((ROOT / "catalog_sources.json").read_text()):
+        destination = directory / (source["name"] + ".xml.gz")
+        incoming = directory / (source["name"] + ".input." + ("yml.gz" if source["format"] == "yaml" else "xml.gz"))
+        converted = directory / (source["name"] + ".converted.xml.gz")
+        record = {"name": source["name"], "url": source["url"]}
+        try:
+            download_url = source["url"]
+            if source["format"] == "rpm":
+                request = urllib.request.Request(download_url, headers={"User-Agent": "LunaOS-AppStream/1"})
+                with urllib.request.urlopen(request, timeout=90) as stream:
+                    download_url = rpm_catalog_url(source, stream.read().decode("utf-8"))
+                record["archive_url"] = download_url
+            elif source["format"] == "fedora-rpm":
+                def fetch_listing(url):
+                    request = urllib.request.Request(url, headers={"User-Agent": "LunaOS-AppStream/1"})
+                    with urllib.request.urlopen(request, timeout=90) as stream:
+                        return stream.read().decode("utf-8")
+                download_url = fedora_rpm_url(source, fetch_listing)
+                record["archive_url"] = download_url
+            request = urllib.request.Request(download_url, headers={"User-Agent": "LunaOS-AppStream/1"})
+            with urllib.request.urlopen(request, timeout=180) as stream, incoming.open("wb") as out:
+                shutil.copyfileobj(stream, out)
+            if source["format"] in ("rpm", "fedora-rpm"):
+                names = subprocess.check_output(["bsdtar", "-tf", str(incoming)], text=True).splitlines()
+                if source["format"] == "fedora-rpm":
+                    member = next((name for name in names if name.endswith("/usr/share/swcatalog/xml/fedora.xml.gz")), "")
+                    if not member:
+                        raise ValueError("Fedora RPM does not contain fedora.xml.gz")
+                else:
+                    member = rpm_catalog_member(names)
+                payload = subprocess.check_output(["bsdtar", "-xOf", str(incoming), member])
+                converted.write_bytes(payload if payload.startswith(b"\x1f\x8b") else gzip.compress(payload, mtime=0))
+                record["member"] = member
+                record["archive_sha256"] = hashlib.sha256(incoming.read_bytes()).hexdigest()
+            elif source["format"] == "yaml":
+                subprocess.run(["appstreamcli", "convert", str(incoming), str(converted)], check=True,
+                               capture_output=True, text=True)
+            else:
+                shutil.copyfile(incoming, converted)
+            root = ET.fromstring(gzip.decompress(converted.read_bytes()))
+            if root.tag != "components" or root.find("component") is None:
+                raise ValueError("Expected a nonempty AppStream catalog")
+            converted.replace(destination)
+            record["status"] = "downloaded"
+            destination.with_name(destination.name + ".source.json").write_text(json.dumps(record, indent=2) + "\n")
+        except (OSError, ValueError, subprocess.CalledProcessError, ET.ParseError) as error:
+            record.update(status="cached" if destination.is_file() else "unavailable", error=str(error))
+            if source["required"] and not destination.is_file():
+                raise
+            print(f"Catalog source {source['name']}: {record['status']}: {error}", flush=True)
+        finally:
+            incoming.unlink(missing_ok=True)
+            converted.unlink(missing_ok=True)
+            report.append(record)
+        if destination.is_file():
+            loaded.append(destination)
+    (directory / "status.json").write_text(json.dumps(report, indent=2) + "\n")
+    if not loaded:
+        raise ValueError("No upstream catalogs available")
+    return loaded[0], loaded[1:]
 
 
 def prepare_enrichment(repo, native_catalog, directory, flathub_path, database_dir,
-                       project_urls=None, reference_root=Path("/usr/share/swcatalog")):
+                       project_urls=None, reference_root=Path("/usr/share/swcatalog"), offline=False,
+                       additional_catalogs=()):
     inputs = directory / "input"
     inputs.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(native_catalog, inputs / f"{repo}.xml.gz")
@@ -410,7 +897,8 @@ def prepare_enrichment(repo, native_catalog, directory, flathub_path, database_d
             shutil.copyfile(source, inputs / source.name)
     output = directory / "catalogs"
     import_catalogs(inputs, flathub_path, output, database_dir,
-                    reference_root / "icons", project_urls)
+                    reference_root / "icons", project_urls,
+                    None if offline else UpstreamResolver(directory.parent / "upstream-cache"), additional_catalogs)
     return output
 
 
@@ -418,13 +906,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog-dir", type=Path, default=Path("/usr/share/swcatalog/xml"))
     parser.add_argument("--flathub-catalog", type=Path, help="Use a local snapshot for an offline import")
+    parser.add_argument("--additional-catalog", type=Path, action="append", default=[], help="Additional AppStream XML snapshots")
     parser.add_argument("--output", type=Path, default=ROOT / "work/enrichment/catalogs")
     parser.add_argument("--database-dir", type=Path, default=Path("/var/lib/pacman/sync"))
+    parser.add_argument("--offline", action="store_true", help="Disable upstream discovery; requires a local catalog snapshot")
     args = parser.parse_args()
+    if args.offline and args.flathub_catalog is None:
+        parser.error("--offline requires --flathub-catalog")
     if args.flathub_catalog is None:
-        args.flathub_catalog = args.output.parent / "flathub.xml.gz"
-        download_catalog(args.flathub_catalog)
-    import_catalogs(args.catalog_dir, args.flathub_catalog, args.output, args.database_dir)
+        args.flathub_catalog, downloaded = download_catalogs(args.output.parent / "sources")
+        args.additional_catalog.extend(downloaded)
+    import_catalogs(args.catalog_dir, args.flathub_catalog, args.output, args.database_dir,
+                    upstream_resolver=None if args.offline else UpstreamResolver(args.output.parent / "upstream-cache"),
+                    additional_catalogs=args.additional_catalog)
 
 
 if __name__ == "__main__":

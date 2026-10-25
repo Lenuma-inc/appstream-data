@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 
 import yaml
 
-from enrich import apply_enrichment, download_catalog, prepare_enrichment
+from enrich import apply_enrichment, download_catalogs, prepare_enrichment
 
 ROOT = Path(__file__).resolve().parent
 RESOURCE_PREFIXES = (
@@ -567,7 +567,9 @@ def package_repo(repo, config, args):
         raise ValueError("Policy changed; run sync and generate again before packaging")
     project_urls = {p["name"]: p["url"][0] for p in manifest["packages"] if p.get("url")}
     enrichment_dir = prepare_enrichment(repo, catalogs[0], args.work / "enrichment" / repo,
-                                        args.enrichment_catalog, args.work / "reference", project_urls)
+                                        args.enrichment_catalog, args.work / "reference", project_urls,
+                                        offline=getattr(args, "offline_enrichment", False),
+                                        additional_catalogs=getattr(args, "enrichment_extra_catalog", ()))
     pkgname = config["package"]
     output = args.output / pkgname
     output.mkdir(parents=True, exist_ok=True)
@@ -629,6 +631,7 @@ def package_repo(repo, config, args):
             sources = json.loads(enrichment_sources.read_text())
             manifest["catalog_enrichment"] = {
                 "catalog_sha256": sources["catalog_sha256"],
+                "catalogs": sources.get("catalogs", []),
                 "components": {f"{item['repository']}/{item['id']}":
                                sources["components"].get(f"{item['repository']}/{item['id']}", {})
                                for item in enrichment_report},
@@ -636,6 +639,10 @@ def package_repo(repo, config, args):
         manifest["generator"] = stamp["generator"]
         doc = share / "doc" / pkgname
         doc.mkdir(parents=True)
+        for report_name in ("audit.json", "quality.json"):
+            report = enrichment_dir / report_name
+            if report.is_file():
+                shutil.copyfile(report, doc / report_name)
         shutil.move(catalog.with_suffix(".validation.yaml"), doc / "validation.yaml")
         (doc / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         license_dir = share / "licenses" / pkgname
@@ -664,11 +671,16 @@ def main():
     parser.add_argument("--output", type=Path, default=ROOT / "dist")
     parser.add_argument("--enrichment-catalog", type=Path,
                         help="Use a local upstream AppStream snapshot instead of downloading it")
+    parser.add_argument("--enrichment-extra-catalog", type=Path, action="append", default=[],
+                        help="Additional local AppStream XML snapshots")
+    parser.add_argument("--offline-enrichment", action="store_true", help="Disable project discovery; requires --enrichment-catalog")
     parser.add_argument("--database-dir", type=Path, default=Path("/var/lib/pacman/sync"),
                         help="Local .files databases for offline plan")
     parser.add_argument("--jobs", type=int, default=4, help="Concurrent downloads")
     parser.add_argument("--version", default=datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d"))
     args = parser.parse_args()
+    if args.offline_enrichment and args.enrichment_catalog is None:
+        parser.error("--offline-enrichment requires --enrichment-catalog")
     if args.jobs < 1 or not re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", args.version):
         parser.error("jobs must be positive; version must be numeric, e.g. 20261022")
     config = json.loads(args.config.read_text())
@@ -707,8 +719,8 @@ def main():
             args.shadowed_packages = repository_shadows(config["repositories"], package_sets)
         if args.command in ("package", "all"):
             if args.enrichment_catalog is None:
-                args.enrichment_catalog = args.work / "enrichment/flathub.xml.gz"
-                download_catalog(args.enrichment_catalog)
+                args.enrichment_catalog, downloaded = download_catalogs(args.work / "enrichment/sources")
+                args.enrichment_extra_catalog.extend(downloaded)
             else:
                 args.enrichment_catalog = args.enrichment_catalog.resolve()
         for repo in repos:

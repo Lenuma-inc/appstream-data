@@ -1,0 +1,39 @@
+[
+  {
+    "name": "flathub",
+    "url": "https://dl.flathub.org/repo/appstream/x86_64/appstream.xml.gz",
+    "format": "xml",
+    "required": true
+  },
+  {
+    "name": "debian-main",
+    "url": "https://appstream.debian.org/data/sid/main/Components-amd64.yml.gz",
+    "format": "yaml",
+    "required": false
+  },
+  {
+    "name": "debian-contrib",
+    "url": "https://appstream.debian.org/data/sid/contrib/Components-amd64.yml.gz",
+    "format": "yaml",
+    "required": false
+  },
+  {
+    "name": "debian-non-free",
+    "url": "https://appstream.debian.org/data/sid/non-free/Components-amd64.yml.gz",
+    "format": "yaml",
+    "required": false
+  },
+  {
+    "name": "altlinux-sisyphus",
+    "url": "https://ftp.altlinux.org/pub/distributions/ALTLinux/Sisyphus/noarch/RPMS.classic/",
+    "format": "rpm",
+    "package_prefix": "appstream-data-desktop-",
+    "required": false
+  },
+  {
+    "name": "fedora-rawhide",
+    "url": "https://kojipkgs.fedoraproject.org/packages/appstream-data/",
+    "format": "fedora-rpm",
+    "required": false
+  }
+]
