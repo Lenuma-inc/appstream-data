@@ -37,6 +37,30 @@ class EnrichmentTests(unittest.TestCase):
         self.assertEqual(native.findtext("pkgname"), "example")
         self.assertEqual(native.findtext("launchable"), "org.example.App.desktop")
 
+    def test_mirrored_screenshots_can_replace_stale_branch_links(self):
+        native = component("Native description. " * 20,
+                           "https://raw.githubusercontent.com/owner/app/master/screenshot.png")
+        upstream = component("Different description. " * 20,
+                             "https://dl.flathub.org/media/org/example/App/hash/screenshots/image-1_orig.png")
+        self.assertTrue(enrich.volatile_screenshots(native))
+        changed = enrich.merge_presentation(native, upstream, replace_screenshots=True)
+        self.assertEqual(changed, ["refreshed-screenshots"])
+        self.assertEqual(native.findtext(".//image"), upstream.findtext(".//image"))
+        self.assertTrue(native.findtext("description/p").startswith("Native description"))
+
+    def test_repaired_screenshots_are_applied_even_when_native_urls_exist(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            root = ET.Element("components")
+            root.append(component(screenshot="https://example.org/old.png"))
+            supplement = ET.Element("components")
+            supplement.append(component(screenshot="https://example.org/working.png"))
+            ET.ElementTree(supplement).write(directory / "chaotic-aur.xml")
+            sources = {"components": {"chaotic-aur/org.example.App": {"fields": ["refreshed-screenshots"]}}}
+            (directory / "sources.json").write_text(json.dumps(sources))
+            enrich.apply_enrichment(root, "chaotic-aur", {"example"}, directory=directory)
+            self.assertEqual(root.findtext("component/.//image"), "https://example.org/working.png")
+
     def test_flatpak_instructions_and_thumbnails_are_not_imported(self):
         upstream = component("Useful portable description. " * 10, "https://example.org/original.png")
         ET.SubElement(upstream.find("description"), "p").text = "Install a Flatpak permission override."
@@ -83,6 +107,18 @@ class EnrichmentTests(unittest.TestCase):
             self.assertEqual(native.findtext("component/id"), "discord.desktop")
             self.assertEqual(names, {"discord"})
             self.assertEqual(enrich.apply_enrichment(native, "lunaos-repo", names, {"discord"}, directory), [])
+
+    def test_reference_does_not_add_second_component_for_native_package(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            extra = ET.Element("components")
+            extra.append(component(package="steam", cid="com.valvesoftware.Steam.desktop"))
+            ET.ElementTree(extra).write(directory / "multilib.xml")
+            native = ET.Element("components")
+            native.append(component(package="steam", cid="steam.desktop"))
+            result = enrich.apply_enrichment(native, "lunaos-repo", {"steam"}, {"steam"}, directory)
+            self.assertEqual(result, [])
+            self.assertEqual(len(native), 1)
 
     def test_common_suite_homepage_does_not_match_different_apps(self):
         with tempfile.TemporaryDirectory() as temporary:

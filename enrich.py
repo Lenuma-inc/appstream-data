@@ -146,7 +146,12 @@ def presentation(component):
     return result
 
 
-def merge_presentation(native, supplement):
+def volatile_screenshots(component):
+    return any(re.match(r"https://raw\.githubusercontent\.com/[^/]+/[^/]+/(?:master|main|HEAD)/", image.text or "")
+               for image in component.findall(".//screenshots/screenshot/image"))
+
+
+def merge_presentation(native, supplement, replace_screenshots=False):
     changed = []
     data = presentation(supplement)
     if description_length(native) < 160 and description_length(data) > description_length(native):
@@ -154,11 +159,11 @@ def merge_presentation(native, supplement):
             native.remove(element)
         native.extend(copy.deepcopy(data.findall("description")))
         changed.append("description")
-    if not has_screenshots(native) and data.find("screenshots") is not None:
+    if (replace_screenshots or not has_screenshots(native)) and data.find("screenshots") is not None:
         for element in native.findall("screenshots"):
             native.remove(element)
         native.append(copy.deepcopy(data.find("screenshots")))
-        changed.append("screenshots")
+        changed.append("refreshed-screenshots" if replace_screenshots else "screenshots")
     return changed
 
 
@@ -166,7 +171,10 @@ def apply_enrichment(root, repo, package_names, reference_names=(), directory=No
     """Apply reviewed snapshots; reference apps are served by the LunaOS catalog."""
     if directory is None:
         return []
+    sources_path = directory / "sources.json"
+    sources = json.loads(sources_path.read_text()).get("components", {}) if sources_path.is_file() else {}
     by_id = {c.findtext("id"): c for c in root.findall("component")}
+    native_packages = {p.text for c in root.findall("component") for p in c.findall("pkgname")}
     applied = []
     repositories = [repo] + (["extra", "multilib", "core"] if repo == "lunaos-repo" else [])
     for source_repo in repositories:
@@ -181,9 +189,10 @@ def apply_enrichment(root, repo, package_names, reference_names=(), directory=No
             if source_repo == repo:
                 if native is None or name not in package_names or native.findtext("pkgname") != name:
                     continue
-                changed = merge_presentation(native, supplement)
+                fields = sources.get(f"{source_repo}/{cid}", {}).get("fields", [])
+                changed = merge_presentation(native, supplement, "refreshed-screenshots" in fields)
             else:
-                if name not in reference_names or native is not None:
+                if name not in reference_names or native is not None or name in native_packages:
                     continue
                 native = copy.deepcopy(supplement)
                 root.append(native)
@@ -205,6 +214,8 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
     local_sources = json.loads((ROOT / "metadata/sources.json").read_text())
     matches_path = ROOT / "metadata/matches.json"
     explicit_matches = json.loads(matches_path.read_text()) if matches_path.is_file() else {}
+    screenshots_path = ROOT / "metadata/screenshot_sources.json"
+    screenshot_sources = json.loads(screenshots_path.read_text()) if screenshots_path.is_file() else {}
     for component in flatpak:
         if component.get("type") != "desktop-application":
             continue
@@ -234,7 +245,8 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
             if native.get("type") != "desktop-application" or not native.findtext("pkgname"):
                 continue
             missing = missing_fields(native)
-            if not missing:
+            volatile = volatile_screenshots(native)
+            if not missing and not volatile:
                 continue
             name, cid = native.findtext("pkgname"), native.findtext("id", "")
             local_metadata = sorted((ROOT / "metadata" / name / "usr/share/metainfo").glob("*.xml"))
@@ -275,6 +287,18 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 local = ET.parse(local_metadata[0]).getroot()
                 candidates = {local.findtext("id", cid): local}
                 reason = "reviewed-native-metainfo"
+            if name in screenshot_sources and not has_screenshots(native):
+                source = screenshot_sources[name]
+                local = copy.deepcopy(native)
+                for old in local.findall("screenshots"):
+                    local.remove(old)
+                screenshots = ET.SubElement(local, "screenshots")
+                for index, image in enumerate(source["images"]):
+                    shot = ET.SubElement(screenshots, "screenshot", **({"type": "default"} if index == 0 else {}))
+                    ET.SubElement(shot, "caption").text = image["caption"]
+                    ET.SubElement(shot, "image", type="source").text = image["url"]
+                candidates = {cid: local}
+                reason = "reviewed-upstream-screenshots"
             record = {"repository": repo, "package": name, "id": cid, "missing": missing}
             if len(candidates) != 1:
                 record["status"] = "needs-upstream-review"
@@ -282,7 +306,11 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 continue
             flat_id, upstream = next(iter(candidates.items()))
             supplement = copy.deepcopy(native)
-            changed = merge_presentation(supplement, upstream)
+            # Prefer a snapshot's mirrored screenshots over URLs tied to a moving
+            # GitHub branch, which may have been renamed since a package release.
+            mirrored = upstream.findall(".//screenshots/screenshot/image")
+            refresh = volatile and any((image.text or "").startswith("https://dl.flathub.org/media/") for image in mirrored)
+            changed = merge_presentation(supplement, upstream, refresh)
             record.update(source_id=flat_id, match=reason, added=changed)
             if not changed:
                 record["status"] = "source-has-no-additional-data"
@@ -338,6 +366,9 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 "licenses": "Upstream metadata and media retain their respective licenses."}
             if reason == "reviewed-native-metainfo":
                 sources[f"{repo}/{cid}"].update(local_sources.get(name, {}))
+                sources[f"{repo}/{cid}"].pop("catalog_url", None)
+            elif reason == "reviewed-upstream-screenshots":
+                sources[f"{repo}/{cid}"].update({key: value for key, value in screenshot_sources[name].items() if key != "images"})
                 sources[f"{repo}/{cid}"].pop("catalog_url", None)
         ET.indent(imported, space="  ")
         ET.ElementTree(imported).write(output / f"{repo}.xml", encoding="utf-8", xml_declaration=True)

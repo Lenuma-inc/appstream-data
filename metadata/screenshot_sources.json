@@ -1,0 +1,26 @@
+{
+  "alvr": {
+    "url": "https://store.steampowered.com/app/3312710/",
+    "credit": "ALVR contributors; screenshots published by the project on Steam",
+    "images": [
+      {
+        "caption": "ALVR dashboard and headset connections",
+        "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3312710/ss_9e3232db29f758150fe801c28c7cea3653d1c6ab.1920x1080.jpg?t=1733597407"
+      },
+      {
+        "caption": "ALVR headset client waiting for the streamer",
+        "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3312710/ss_ccb724f5ac8699a8e216fe703a040277f9dd21d0.1920x1080.jpg?t=1733597407"
+      }
+    ]
+  },
+  "amethyst-mod-manager": {
+    "url": "https://github.com/ChrisDKN/Amethyst-Mod-Manager/blob/544d0055eab0916fbf65b9adabe761ddd3fff06a/README.md",
+    "credit": "ChrisDKN and Amethyst Mod Manager contributors",
+    "images": [
+      {
+        "caption": "Amethyst Mod Manager interface",
+        "url": "https://raw.githubusercontent.com/ChrisDKN/Amethyst-Mod-Manager/544d0055eab0916fbf65b9adabe761ddd3fff06a/src/icons/ui.png"
+      }
+    ]
+  }
+}

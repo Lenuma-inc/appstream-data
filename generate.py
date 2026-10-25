@@ -124,7 +124,7 @@ def database_names(path, architecture):
     return names
 
 
-def apply_policy(selected, available, policy):
+def apply_policy(selected, available, policy, shadowed=None):
     """Filter visibility before asgen can collapse duplicate component IDs."""
     keep = set(policy["keep_packages"])
     excluded = {}
@@ -135,8 +135,8 @@ def apply_policy(selected, available, policy):
     result = {}
     for dirname, record in selected.items():
         name = record["fields"]["NAME"][0]
-        reason = None
-        if name not in keep:
+        reason = f"preferred repository: {shadowed[name]}" if shadowed and name in shadowed else None
+        if reason is None and name not in keep:
             pattern = next((p for p in policy["exclude_packages"] if fnmatch.fnmatchcase(name, p)), None)
             if pattern:
                 reason = f"exclude_packages: {pattern}"
@@ -155,6 +155,18 @@ def apply_policy(selected, available, policy):
     return result, excluded
 
 
+def repository_shadows(config, package_sets):
+    """Assign overlapping packages to the highest-priority generated repository."""
+    ordered = sorted(config, key=lambda repo: config[repo]["priority"], reverse=True)
+    owners, result = {}, {}
+    for repo in ordered:
+        names = package_sets.get(repo, set())
+        result[repo] = {name: owners[name] for name in names if name in owners}
+        for name in names:
+            owners.setdefault(name, repo)
+    return result
+
+
 def load_policy(path):
     policy = json.loads(path.read_text())
     for key in ("exclude_packages", "keep_packages", "binary_suffixes", "exclude_components"):
@@ -167,7 +179,7 @@ def load_policy(path):
 
 def prepare_context(config, args, architecture, download):
     """Arch is read only for package-name comparisons, never for catalog generation."""
-    names = set()
+    names, package_sets = set(), {}
     sources = list(config["repositories"].items()) + list(config.get("reference_repositories", {}).items())
     for repo, settings in sources:
         token(repo)
@@ -178,7 +190,11 @@ def prepare_context(config, args, architecture, download):
             fetch([f"{s}/{repo}.{extension}" for s in servers(repo, settings, architecture)], path)
         else:
             path = args.database_dir / f"{repo}.{extension}"
-        names.update(database_names(path, architecture))
+        repository_names = database_names(path, architecture)
+        names.update(repository_names)
+        if target_repo:
+            package_sets[repo] = repository_names
+    args.shadowed_packages = repository_shadows(config["repositories"], package_sets)
     return names
 
 
@@ -261,7 +277,8 @@ def sync_repo(repo, config, args, architecture):
     snapshot = workspace / "input.files"
     records = read_database(snapshot)
     selected = select_packages(records, architecture, config.get("include_packages", []))
-    selected, excluded = apply_policy(selected, args.available, args.policy_data)
+    selected, excluded = apply_policy(selected, args.available, args.policy_data,
+                                      args.shadowed_packages.get(repo, {}))
     report_plan(repo, records, selected)
     report_excluded(excluded, args.explain)
     cache = workspace / "packages" / RESOURCE_SCHEMA
@@ -426,11 +443,16 @@ def unpack_icons(archive_path, destination):
 
 
 def write_catalog(source, destination, priority, package_names, excluded_components=(),
-                  repo=None, reference_names=(), enrichment_report=None, enrichment_dir=None):
+                  repo=None, reference_names=(), enrichment_report=None, enrichment_dir=None,
+                  excluded_packages=()):
     with gzip.open(source, "rb") as stream:
         root = ET.parse(stream).getroot()
     if root.tag != "components":
         raise ValueError("Expected an AppStream catalog with <components> root")
+    # Filter cached asgen results as well as the packages selected during sync.
+    for component in list(root.findall("component")):
+        if any(p.text in excluded_packages for p in component.findall("pkgname")):
+            root.remove(component)
     if repo is not None:
         applied = apply_enrichment(root, repo, package_names, reference_names, enrichment_dir)
         if enrichment_report is not None:
@@ -567,7 +589,8 @@ def package_repo(repo, config, args):
         try:
             origin, count = write_catalog(catalogs[0], catalog, config["priority"], names,
                                           args.policy_data["exclude_components"], repo,
-                                          reference_names, enrichment_report, enrichment_dir)
+                                          reference_names, enrichment_report, enrichment_dir,
+                                          args.shadowed_packages.get(repo, {}))
         finally:
             report = catalog.with_suffix(".validation.yaml")
             if report.is_file():
@@ -664,7 +687,8 @@ def main():
             records = read_database(args.database_dir / f"{repo}.files")
             selected = select_packages(records, architecture,
                                        config["repositories"][repo].get("include_packages", []))
-            selected, excluded = apply_policy(selected, args.available, args.policy_data)
+            selected, excluded = apply_policy(selected, args.available, args.policy_data,
+                                              args.shadowed_packages.get(repo, {}))
             report_plan(repo, records, selected)
             report_excluded(excluded, args.explain)
         return
@@ -673,6 +697,14 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if args.command in ("sync", "all"):
             args.available = prepare_context(config, args, architecture, download=True)
+        elif args.command == "package":
+            package_sets = {}
+            for name in config["repositories"]:
+                snapshot = args.work / name / "input.files"
+                if not snapshot.is_file():
+                    raise ValueError(f"Missing repository snapshot {snapshot}; run sync first")
+                package_sets[name] = database_names(snapshot, architecture)
+            args.shadowed_packages = repository_shadows(config["repositories"], package_sets)
         if args.command in ("package", "all"):
             if args.enrichment_catalog is None:
                 args.enrichment_catalog = args.work / "enrichment/flathub.xml.gz"

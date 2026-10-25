@@ -14,6 +14,12 @@ spotify-qt, Discord Chat Exporter, Terasology and the Minecraft launcher icon.
 `sources.json` records their provenance and the licenses declared for the
 supplemental metadata. Referenced images retain their upstream licenses.
 
+`screenshot_sources.json` contains reviewed upstream image references for apps
+whose AppStream data has no screenshots. These entries add only images and
+captions, preserving the native descriptions, licenses and launchers. Mirrored
+Flathub screenshots can also replace moving GitHub-branch URLs, avoiding links
+broken by branch renames.
+
 To inspect all installed catalogs without downloading the source again:
 
 ```sh
