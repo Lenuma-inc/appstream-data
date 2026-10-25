@@ -70,6 +70,35 @@ class EnrichmentTests(unittest.TestCase):
         self.assertNotIn("Flatpak", ET.tostring(data, encoding="unicode"))
         self.assertEqual(len(data.findall(".//image")), 1)
 
+    def test_native_catalog_description_drops_flatpak_only_caveats(self):
+        native = component("Useful introduction")
+        ET.SubElement(native.find("description"), "p").text = "The Flatpak version has limitations."
+        self.assertTrue(enrich.remove_flatpak_instructions(native))
+        self.assertEqual([p.text for p in native.findall("description/p")], ["Useful introduction"])
+
+    def test_flatpak_only_description_is_preserved_when_cleaning_would_empty_it(self):
+        native = component("The Flatpak version is sandboxed.")
+        self.assertFalse(enrich.remove_flatpak_instructions(native))
+        self.assertEqual(native.findtext("description/p"), "The Flatpak version is sandboxed.")
+
+    def test_upstream_description_does_not_replace_native_translations(self):
+        native = component("Краткое описание", name="Example")
+        native.find("description").set(enrich.LANG, "ru")
+        supplement = component("A longer upstream description. " * 10)
+        ET.SubElement(supplement.find("description"), "p", **{enrich.LANG: "fr"}).text = "Traduction source"
+        self.assertEqual(enrich.merge_presentation(native, supplement), ["description"])
+        self.assertEqual(native.findtext("description[@{http://www.w3.org/XML/1998/namespace}lang='ru']/p"), "Краткое описание")
+        self.assertTrue(any(not d.get(enrich.LANG) for d in native.findall("description")))
+        self.assertFalse(any(d.get(enrich.LANG) == "fr" for d in native.findall("description")))
+
+    def test_manual_screenshots_replace_dead_catalog_urls(self):
+        native = component(screenshot="https://example.org/dead.png")
+        self.assertTrue(enrich.apply_manual_screenshots(native, [{
+            "url": "https://example.org/current.png", "caption": "Current application view"
+        }]))
+        self.assertEqual(native.findtext(".//image"), "https://example.org/current.png")
+        self.assertEqual(native.findtext(".//caption"), "Current application view")
+
     def test_invalid_source_urls_and_duplicate_source_images_are_normalized(self):
         upstream = component(screenshot="https://example.org/one.png")
         shot = upstream.find(".//screenshot")

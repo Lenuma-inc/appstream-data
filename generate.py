@@ -178,7 +178,7 @@ def load_policy(path):
 
 
 def prepare_context(config, args, architecture, download):
-    """Arch is read only for package-name comparisons, never for catalog generation."""
+    """Read Arch package databases to resolve package visibility and references."""
     names, package_sets = set(), {}
     sources = list(config["repositories"].items()) + list(config.get("reference_repositories", {}).items())
     for repo, settings in sources:
@@ -660,6 +660,43 @@ def package_repo(repo, config, args):
     print(f"Prepared {output}: {count} components, origin={origin}", flush=True)
 
 
+def package_reference_catalogs(args, reference_root=Path("/usr/share/swcatalog")):
+    """Repackage Arch catalogs with reviewed AppStream presentation fixes."""
+    enrichment = args.work / "enrichment" / "lunaos-repo" / "catalogs"
+    if not all((enrichment / f"{repo}-enriched.xml.gz").is_file()
+               for repo in ("extra", "core", "multilib")):
+        raise ValueError(f"Missing enriched Arch catalogs in {enrichment}; package lunaos-repo first")
+    output = args.output / "archlinux-appstream-data"
+    output.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="arch-swcatalog-", dir=args.work) as temp:
+        stage = Path(temp)
+        share = stage / "usr/share"
+        source_root = reference_root
+        target_root = share / "swcatalog"
+        xml_dir = target_root / "xml"
+        icon_root = target_root / "icons"
+        xml_dir.mkdir(parents=True)
+        icon_root.mkdir(parents=True)
+        for repo in ("extra", "core", "multilib"):
+            shutil.copytree(source_root / "icons" / f"archlinux-arch-{repo}",
+                            icon_root / f"archlinux-arch-{repo}")
+            shutil.copyfile(enrichment / f"{repo}-enriched.xml.gz", xml_dir / f"{repo}.xml.gz")
+        doc = stage / "usr/share/doc/archlinux-appstream-data"
+        doc.mkdir(parents=True)
+        provenance = enrichment / "sources.json"
+        if provenance.is_file():
+            shutil.copyfile(provenance, doc / "metadata-enrichment-sources.json")
+        (doc / "README").write_text(
+            "Arch Linux AppStream catalogs with reviewed presentation metadata updates.\n"
+            "Package mappings, catalog origins and icons are retained from Arch Linux.\n"
+            "Supplemental screenshot and description sources are listed in\n"
+            "metadata-enrichment-sources.json.\n"
+        )
+        filename = f"archlinux-appstream-data-{args.version}.tar.gz"
+        source_archive(stage, output / filename, f"archlinux-appstream-data-{args.version}")
+    print(f"Prepared {output}: enriched extra/core/multilib catalogs", flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("plan", "sync", "generate", "package", "all"))
@@ -731,6 +768,8 @@ def main():
                 generate(repo, args, architecture)
             if args.command in ("package", "all"):
                 package_repo(repo, settings, args)
+        if args.command in ("package", "all") and "lunaos-repo" in repos:
+            package_reference_catalogs(args)
 
 
 if __name__ == "__main__":

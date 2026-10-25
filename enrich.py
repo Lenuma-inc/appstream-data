@@ -8,6 +8,7 @@ Generated catalogs and audit reports belong in work/, not in metadata/.
 import argparse
 from collections import defaultdict
 import copy
+import datetime
 import fnmatch
 import gzip
 import hashlib
@@ -346,6 +347,10 @@ def description_length(component):
     return len(" ".join(description.itertext()).strip()) if description is not None else 0
 
 
+def default_descriptions(component):
+    return [description for description in component.findall("description") if not description.get(LANG)]
+
+
 def missing_fields(component):
     result = []
     if description_length(component) < 160:
@@ -360,6 +365,50 @@ def missing_fields(component):
 def has_screenshots(component):
     return any((image.text or "").strip().startswith(("https://", "http://"))
                for image in component.findall(".//screenshots/screenshot/image"))
+
+
+def remove_flatpak_instructions(component):
+    """Remove Flatpak-only caveats from metadata shown for native packages."""
+    removed = False
+    for description in component.findall("description"):
+        original = copy.deepcopy(description)
+        changed = False
+        for parent in list(description.iter()):
+            for child in list(parent):
+                text = " ".join(child.itertext()).lower()
+                if child.tag in ("p", "li") and any(word in text for word in ("flatpak", "flathub")):
+                    parent.remove(child)
+                    changed = True
+        for child in list(description):
+            if not "".join(child.itertext()).strip():
+                description.remove(child)
+        if changed and not "".join(description.itertext()).strip():
+            component.remove(description)
+            component.append(original)
+        elif changed:
+            removed = True
+    return removed
+
+
+def replace_presentation(target, source):
+    for tag in ("description", "screenshots"):
+        for element in target.findall(tag):
+            target.remove(element)
+        target.extend(copy.deepcopy(source.findall(tag)))
+
+
+def apply_manual_screenshots(component, images):
+    if not images:
+        return False
+    for old in component.findall("screenshots"):
+        component.remove(old)
+    screenshots = ET.SubElement(component, "screenshots")
+    for index, image in enumerate(images):
+        shot = ET.SubElement(screenshots, "screenshot", **({"type": "default"} if index == 0 else {}))
+        if image.get("caption"):
+            ET.SubElement(shot, "caption").text = image["caption"]
+        ET.SubElement(shot, "image", type="source").text = image["url"]
+    return True
 
 
 def presentation(component):
@@ -445,10 +494,11 @@ def volatile_screenshots(component):
 def merge_presentation(native, supplement, replace_screenshots=False):
     changed = []
     data = presentation(supplement)
-    if description_length(native) < 160 and description_length(data) > description_length(native):
-        for element in native.findall("description"):
+    incoming_descriptions = default_descriptions(data)
+    if description_length(native) < 160 and incoming_descriptions and description_length(data) > description_length(native):
+        for element in default_descriptions(native):
             native.remove(element)
-        native.extend(copy.deepcopy(data.findall("description")))
+        native.extend(copy.deepcopy(incoming_descriptions))
         changed.append("description")
     if (replace_screenshots or not has_screenshots(native)) and data.find("screenshots") is not None:
         for element in native.findall("screenshots"):
@@ -559,6 +609,8 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
         if repo not in ("lunaos-repo", "chaotic-aur", "extra", "core", "multilib"):
             continue
         catalog = ET.fromstring(gzip.decompress(path.read_bytes()))
+        full_catalog = copy.deepcopy(catalog)
+        full_components = {c.findtext("id"): c for c in full_catalog.findall("component")}
         origin = catalog.get("origin", "")
         imported = ET.Element("components", version="1.0")
         jobs = {}
@@ -590,13 +642,19 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
         for native in catalog.findall("component"):
             if native.get("type") != "desktop-application" or not native.findtext("pkgname"):
                 continue
+            full_native = full_components.get(native.findtext("id", ""))
+            flatpak_text_removed = remove_flatpak_instructions(native)
+            if full_native is not None:
+                remove_flatpak_instructions(full_native)
             missing = missing_fields(native)
             volatile = volatile_screenshots(native)
             name, cid = native.findtext("pkgname"), native.findtext("id", "")
+            manual_screenshots = screenshot_sources.get(name, {})
+            force_screenshot_refresh = bool(manual_screenshots.get("replace_screenshots"))
             if (name not in policy["keep_packages"] and any(fnmatch.fnmatchcase(name, p) for p in policy["exclude_packages"])) or any(fnmatch.fnmatchcase(cid, p) for p in policy["exclude_components"]):
                 audit.append({"repository": repo, "package": name, "id": cid, "missing": missing, "status": "excluded-by-policy"})
                 continue
-            if not missing and not volatile:
+            if not missing and not volatile and not flatpak_text_removed and not force_screenshot_refresh:
                 audit.append({"repository": repo, "package": name, "id": cid, "missing": [], "status": "complete", "remaining": []})
                 continue
             local_metadata = sorted((ROOT / "metadata" / name / "usr/share/metainfo").glob("*.xml"))
@@ -638,20 +696,14 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 candidates = {local.findtext("id", cid): local}
                 reason = "reviewed-native-metainfo"
             discovered = upstream_results.get(cid, {})
-            if (name in screenshot_sources and screenshot_sources[name].get("images") and
-                    not has_screenshots(native) and
-                    not any(has_screenshots(candidate) for candidate in candidates.values())):
-                source = screenshot_sources[name]
+            if (manual_screenshots.get("images") and
+                    (force_screenshot_refresh or (not has_screenshots(native) and
+                     not any(has_screenshots(candidate) for candidate in candidates.values())))):
+                source = manual_screenshots
                 local = copy.deepcopy(native)
                 if candidates:
                     merge_presentation(local, next(iter(candidates.values())))
-                for old in local.findall("screenshots"):
-                    local.remove(old)
-                screenshots = ET.SubElement(local, "screenshots")
-                for index, image in enumerate(source["images"]):
-                    shot = ET.SubElement(screenshots, "screenshot", **({"type": "default"} if index == 0 else {}))
-                    ET.SubElement(shot, "caption").text = image["caption"]
-                    ET.SubElement(shot, "image", type="source").text = image["url"]
+                apply_manual_screenshots(local, source["images"])
                 candidates = {cid: local}
                 reason = "reviewed-upstream-screenshots"
             record = {"repository": repo, "package": name, "id": cid, "missing": missing}
@@ -684,13 +736,19 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
             # Prefer a snapshot's mirrored screenshots over URLs tied to a moving
             # GitHub branch, which may have been renamed since a package release.
             mirrored = upstream.findall(".//screenshots/screenshot/image")
-            refresh = volatile and any((image.text or "").startswith("https://dl.flathub.org/media/") for image in mirrored)
+            refresh = (force_screenshot_refresh or
+                       (volatile and any((image.text or "").startswith("https://dl.flathub.org/media/")
+                                         for image in mirrored)))
             changed = merge_presentation(supplement, upstream, refresh)
+            if flatpak_text_removed:
+                changed.insert(0, "removed-flatpak-specific-description")
             record.update(source_id=flat_id, match=reason, added=changed)
             if not changed:
                 record["status"] = "source-has-no-additional-data"
                 audit.append(record)
                 continue
+            if full_native is not None:
+                replace_presentation(full_native, supplement)
             if repo in ("extra", "core", "multilib"):
                 if any(re.search(r"https?://", element.text or "") for element in supplement.findall("summary")):
                     for element in supplement.findall("summary"):
@@ -756,6 +814,11 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 sources[f"{repo}/{cid}"].pop("catalog_url", None)
         ET.indent(imported, space="  ")
         ET.ElementTree(imported).write(output / f"{repo}.xml", encoding="utf-8", xml_declaration=True)
+        if repo in ("extra", "core", "multilib"):
+            full_catalog.set("time", datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+            with (output / f"{repo}-enriched.xml.gz").open("wb") as raw:
+                with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as zipped:
+                    ET.ElementTree(full_catalog).write(zipped, encoding="utf-8", xml_declaration=True)
     sources_doc = {"catalog_sha256": hashlib.sha256(flathub_path.read_bytes()).hexdigest(), "catalogs": catalog_sources, "components": sources}
     (output / "sources.json").write_text(json.dumps(sources_doc, indent=2) + "\n")
     (output / "audit.json").write_text(json.dumps(audit, indent=2) + "\n")

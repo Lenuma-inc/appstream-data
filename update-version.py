@@ -15,7 +15,7 @@ old_release = int(re.search(r"^pkgrel=(\d+)$", text, re.MULTILINE).group(1))
 if sys.argv[1:] == ["--finalize"]:
     version, release = previous, old_release
     checksums = []
-    for name in ("lunaos-appstream-data", "chaotic-aur-appstream-data"):
+    for name in ("lunaos-appstream-data", "chaotic-aur-appstream-data", "archlinux-appstream-data"):
         with (root / "dist" / name / f"{name}-{version}.tar.gz").open("rb") as stream:
             checksums.append(hashlib.file_digest(stream, "sha256").hexdigest())
     text = re.sub(r"sha256sums=\([^)]*\)",

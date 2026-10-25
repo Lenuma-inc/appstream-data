@@ -74,19 +74,22 @@ jobs:
             gh release download "$previous_tag" --repo "$GITHUB_REPOSITORY" \
               --pattern 'lunaos-appstream-data-*.tar.gz' \
               --pattern 'chaotic-aur-appstream-data-*.tar.gz' \
+              --pattern 'archlinux-appstream-data-*.tar.gz' \
               --dir "$previous_dir"
           fi
           version=$(sed -n 's/^pkgver=//p' PKGBUILD)
           result=$(python compare-catalogs.py --previous-dir "$previous_dir" \
             --current "dist/lunaos-appstream-data/lunaos-appstream-data-$version.tar.gz" \
-            --current "dist/chaotic-aur-appstream-data/chaotic-aur-appstream-data-$version.tar.gz")
+            --current "dist/chaotic-aur-appstream-data/chaotic-aur-appstream-data-$version.tar.gz" \
+            --current "dist/archlinux-appstream-data/archlinux-appstream-data-$version.tar.gz")
           printf '%s\n' "$result"
           changed=$(printf '%s\n' "$result" | tail -n1 | cut -d= -f2)
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
       - name: Build pacman packages
         if: github.ref != 'refs/heads/main' || steps.catalog-change.outputs.changed == 'true'
         run: |
-          cp dist/lunaos-appstream-data/*.tar.gz dist/chaotic-aur-appstream-data/*.tar.gz .
+          cp dist/lunaos-appstream-data/*.tar.gz dist/chaotic-aur-appstream-data/*.tar.gz \
+            dist/archlinux-appstream-data/*.tar.gz .
           runuser -u builder -- makepkg --cleanbuild --noconfirm --nodeps
       - name: Publish catalog sources
         if: github.ref == 'refs/heads/main' && steps.catalog-change.outputs.changed == 'true'
@@ -97,8 +100,10 @@ jobs:
           version=$(sed -n 's/^pkgver=//p' PKGBUILD)
           release=$(sed -n 's/^pkgrel=//p' PKGBUILD)
           gh release create "$version-$release" --target "$GITHUB_SHA" \
-            --title "$version-$release" --notes 'Generated AppStream catalogs.' \
-            dist/lunaos-appstream-data/*.tar.gz dist/chaotic-aur-appstream-data/*.tar.gz
+            --title "$version-$release" \
+            --notes 'Generated LunaOS, Chaotic-AUR, and enriched Arch AppStream catalogs.' \
+            dist/lunaos-appstream-data/*.tar.gz dist/chaotic-aur-appstream-data/*.tar.gz \
+            dist/archlinux-appstream-data/*.tar.gz
       - name: Publish successful catalog version for lunaos-repo buildbot
         if: github.ref == 'refs/heads/main' && steps.catalog-change.outputs.changed == 'true'
         run: |

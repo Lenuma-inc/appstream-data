@@ -1,4 +1,41 @@
 {
+  "bluefish": {
+    "url": "https://bluefish.openoffice.nl/screenshots.html",
+    "credit": "Bluefish project screenshot gallery",
+    "replace_screenshots": true,
+    "images": [
+      {
+        "url": "https://bluefish.openoffice.nl/screenshots/fs_sidebyside.png",
+        "caption": "Bluefish editing HTML with a side-by-side preview"
+      },
+      {
+        "url": "https://bluefish.openoffice.nl/screenshots/fs_C_search_replace.png",
+        "caption": "Bluefish search and replace tools"
+      },
+      {
+        "url": "https://bluefish.openoffice.nl/screenshots/fs_pythondev.png",
+        "caption": "Bluefish editing Python code"
+      }
+    ]
+  },
+  "limesuite": {
+    "url": "https://wiki.myriadrf.org/Getting_Started_with_LimeSDR-USB_and_LimeSuiteGUI",
+    "credit": "MyriadRF LimeSuiteGUI documentation",
+    "images": [
+      {
+        "url": "https://wiki.myriadrf.org/images/2/22/LimeSDR-USB_SelfTest_FFT.jpg",
+        "caption": "LimeSuiteGUI FFT viewer during a LimeSDR self-test"
+      },
+      {
+        "url": "https://wiki.myriadrf.org/images/5/55/Opening_connection_settings.png",
+        "caption": "LimeSuiteGUI connection settings"
+      },
+      {
+        "url": "https://wiki.myriadrf.org/images/6/6f/Opening_LimeSuiteGUI_file.png",
+        "caption": "Launching LimeSuiteGUI"
+      }
+    ]
+  },
   "alvr": {
     "url": "https://store.steampowered.com/app/3312710/",
     "credit": "ALVR contributors; Steam store metadata and screenshots"
