@@ -28,8 +28,8 @@ image or logo while leaving the remaining screenshots to automatic discovery.
 
 ALT metadata is read from the `appstream-data-desktop` RPM, and Fedora metadata
 from Fedora's `appstream-data` RPM; neither package is installed. Their current
-RPMs are resolved from the official package indexes and the extracted catalogs
-are recorded in source reports.
+RPMs are resolved from repository indexes and the extracted catalogs are recorded
+in source reports.
 
 To package existing generator exports using local upstream snapshots:
 

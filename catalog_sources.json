@@ -25,7 +25,7 @@
   },
   {
     "name": "altlinux-sisyphus",
-    "url": "https://ftp.altlinux.org/pub/distributions/ALTLinux/Sisyphus/noarch/RPMS.classic/",
+    "url": "https://mirror.yandex.ru/altlinux/Sisyphus/noarch/RPMS.classic/",
     "format": "rpm",
     "package_prefix": "appstream-data-desktop-",
     "required": false
