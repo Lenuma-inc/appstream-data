@@ -62,11 +62,18 @@ def main(argv=None):
         probe = row.get("upstream_check", {})
         source_id = f"; source={row['source_id']} ({row['match']})" if row.get("source_id") else ""
         source = f"; upstream={probe['status']}" if probe.get("status") else ""
+        found = []
+        if probe.get("description_candidates"):
+            found.append(f"{probe['description_candidates']} description candidate(s)")
+        if probe.get("validated_screenshots"):
+            found.append(f"{probe['validated_screenshots']} screenshot(s)")
+        available = f"; upstream found: {', '.join(found)}" if found else ""
         url = f"; {probe['url']}" if probe.get("url") else ""
-        print("- {repository}/{package} ({id}): missing {fields}; status={status}{source_id}{source}{url}".format(
+        print("- {repository}/{package} ({id}): missing {fields}; status={status}{source_id}{source}{available}{url}".format(
             repository=row.get("repository", "?"), package=row.get("package", "?"),
             id=row.get("id", "?"), fields=", ".join(row["remaining"]),
-            status=row.get("status", "unknown"), source_id=source_id, source=source, url=url))
+            status=row.get("status", "unknown"), source_id=source_id, source=source,
+            available=available, url=url))
     return 0
 
 

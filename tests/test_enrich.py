@@ -112,6 +112,39 @@ class EnrichmentTests(unittest.TestCase):
             self.assertEqual(len(result["paragraphs"]), 1)
             self.assertIn("application overview", result["paragraphs"][0])
 
+    def test_website_resolver_reads_json_ld_description_and_largest_lazy_image(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            resolver = enrich.UpstreamResolver(temporary)
+            html = (b'<script type="application/ld+json">'
+                    b'{"@type":"SoftwareApplication","description":"A sufficiently detailed '
+                    b'application description that explains what this software does and gives '
+                    b'people useful context before they install it."}</script>'
+                    b'<img alt="Screenshot of main window" '
+                    b'data-srcset="/small.png 480w, /large.png 1280w">')
+            resolver.fetch = lambda url, limit=512 * 1024: html
+            resolver.image = lambda url, caption: {
+                "url": url, "caption": caption, "width": 1280, "height": 720,
+            }
+
+            result = resolver.resolve(component(), "https://example.org/app")
+
+            self.assertEqual(len(result["paragraphs"]), 1)
+            self.assertEqual(result["images"][0]["url"], "https://example.org/large.png")
+
+    def test_reviewed_native_metadata_keeps_missing_catalog_screenshots(self):
+        local = component("Reviewed local description. " * 8)
+        upstream = component(
+            "A longer catalog description. " * 10,
+            "https://example.org/screenshot.png",
+            cid="com.example.App",
+        )
+
+        candidates = enrich.reviewed_native_metadata(local, {"com.example.App": upstream})
+
+        self.assertEqual(candidates["org.example.App"].findtext("pkgname"), "example")
+        self.assertEqual(candidates["org.example.App"].findtext(".//image"),
+                         "https://example.org/screenshot.png")
+
     def test_website_resolver_skips_project_documentation_as_app_description(self):
         with tempfile.TemporaryDirectory() as temporary:
             resolver = enrich.UpstreamResolver(temporary)
@@ -132,6 +165,11 @@ class EnrichmentTests(unittest.TestCase):
         upstream = component("Different upstream description. " * 30, "https://upstream.example/shot.png", package="flatpak-package")
         self.assertEqual(enrich.merge_presentation(native, upstream), [])
         self.assertEqual(ET.tostring(native), before)
+
+    def test_useful_short_description_is_not_reported_as_missing(self):
+        native = component("A concise but useful application description. " * 3)
+        self.assertGreaterEqual(enrich.description_length(native), 120)
+        self.assertNotIn("description", enrich.missing_fields(native))
 
     def test_missing_data_is_added_without_replacing_launchers_or_packages(self):
         native = component()
@@ -264,6 +302,59 @@ class EnrichmentTests(unittest.TestCase):
             enrich.import_catalogs(catalogs, directory / "flathub.xml.gz", directory / "output", directory / "no-databases")
             audit = json.loads((directory / "output/audit.json").read_text())
             self.assertEqual(audit[0]["status"], "needs-upstream-review")
+
+    def test_duplicate_component_ids_keep_upstream_lookups_separate(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            catalogs = directory / "xml"
+            catalogs.mkdir()
+            native_components = []
+            for package, name, homepage in (
+                ("first-app", "First App", "https://first.example/app"),
+                ("second-app", "Second App", "https://second.example/app"),
+            ):
+                native = component(cid="shared.desktop", package=package, name=name)
+                ET.SubElement(native, "url", type="homepage").text = homepage
+                native_components.append(native)
+            native_root = ET.Element("components", version="1.0")
+            native_root.extend(native_components)
+            (catalogs / "chaotic-aur.xml.gz").write_bytes(gzip.compress(ET.tostring(native_root)))
+            flatpak_root = ET.Element("components", version="1.0")
+            flatpak_path = directory / "flathub.xml.gz"
+            flatpak_path.write_bytes(gzip.compress(ET.tostring(flatpak_root)))
+
+            class Resolver:
+                def supports(self, native, url, trusted_project_url=False):
+                    return True
+
+                def resolve_many(self, jobs):
+                    self.keys = set(jobs)
+                    return {
+                        key: {
+                            "status": "found",
+                            "url": url,
+                            "project_url": url,
+                            "paragraphs": [f"Description for {key[1]}. " * 20],
+                            "images": [],
+                        }
+                        for key, (_, url, _) in jobs.items()
+                    }
+
+            resolver = Resolver()
+            enrich.import_catalogs(
+                catalogs, flatpak_path, directory / "output", directory / "no-databases",
+                upstream_resolver=resolver,
+            )
+
+            output = ET.parse(directory / "output/chaotic-aur.xml").getroot()
+            descriptions = {item.findtext("pkgname"): item.findtext("description/p")
+                            for item in output.findall("component")}
+            self.assertEqual(resolver.keys, {
+                ("chaotic-aur", "first-app", "shared.desktop"),
+                ("chaotic-aur", "second-app", "shared.desktop"),
+            })
+            self.assertIn("first-app", descriptions["first-app"])
+            self.assertIn("second-app", descriptions["second-app"])
 
     def test_vscodium_wayland_uses_the_appstream_match_instead_of_its_readme(self):
         with tempfile.TemporaryDirectory() as temporary:

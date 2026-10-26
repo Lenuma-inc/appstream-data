@@ -18,23 +18,17 @@ import re
 import shutil
 import subprocess
 import tarfile
-from urllib.parse import urljoin, urlsplit
-import urllib.request
-import xml.etree.ElementTree as ET
-
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import hashlib
-from html import unescape
-from html.parser import HTMLParser
-import io
-import json
-from pathlib import Path
-import re
 import threading
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urljoin, urlsplit
 import urllib.request
+import xml.etree.ElementTree as ET
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from html import unescape
+from html.parser import HTMLParser
+import io
 
 
 def normalized(value):
@@ -104,9 +98,13 @@ class WebsitePresentation(HTMLParser):
         self.main_depth = 0
         self.capture = False
         self.text = []
+        self.json_ld = False
+        self.json_ld_text = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if tag == "script" and attrs.get("type", "").casefold() == "application/ld+json":
+            self.json_ld, self.json_ld_text = True, []
         if tag == "meta":
             key = (attrs.get("name") or attrs.get("property") or "").casefold()
             content = " ".join((attrs.get("content") or "").split())
@@ -118,7 +116,13 @@ class WebsitePresentation(HTMLParser):
             self.capture, self.text = True, []
         if tag != "img":
             return
-        src = attrs.get("src") or attrs.get("data-src") or attrs.get("data-lazy-src")
+        src = (attrs.get("src") or attrs.get("data-src") or attrs.get("data-lazy-src") or
+               attrs.get("data-original") or attrs.get("data-srcset") or
+               attrs.get("data-lazy-srcset") or attrs.get("srcset"))
+        if src and "," in src:
+            # Responsive image sets list candidates from small to large on
+            # most sites. Use the largest advertised source for catalog media.
+            src = src.split(",")[-1].strip().split()[0]
         label = " ".join((attrs.get(key) or "") for key in ("alt", "title", "class", "id", "data-caption"))
         filename = Path(urlsplit(src or "").path).name
         label += " " + filename
@@ -127,6 +131,20 @@ class WebsitePresentation(HTMLParser):
             self.images.append((src, attrs.get("alt") or attrs.get("title") or "Application interface"))
 
     def handle_endtag(self, tag):
+        if tag == "script" and self.json_ld:
+            try:
+                payload = json.loads("".join(self.json_ld_text))
+                queue = payload if isinstance(payload, list) else [payload]
+                for item in queue:
+                    if isinstance(item, dict):
+                        if isinstance(item.get("@graph"), list):
+                            queue.extend(item["@graph"])
+                        description = item.get("description")
+                        if isinstance(description, str):
+                            self.paragraphs.append(" ".join(description.split()))
+            except (ValueError, TypeError):
+                pass
+            self.json_ld, self.json_ld_text = False, []
         if tag == "p" and self.capture:
             paragraph = " ".join("".join(self.text).split())
             if 120 <= len(paragraph) <= 1800:
@@ -136,6 +154,8 @@ class WebsitePresentation(HTMLParser):
             self.main_depth -= 1
 
     def handle_data(self, data):
+        if self.json_ld:
+            self.json_ld_text.append(data)
         if self.capture:
             self.text.append(data)
 
@@ -406,6 +426,7 @@ class UpstreamResolver:
 ROOT = Path(__file__).resolve().parent
 LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 FLATHUB_URL = "https://dl.flathub.org/repo/appstream/x86_64/appstream.xml.gz"
+DESCRIPTION_MIN_LENGTH = 120
 
 
 def normalize(value):
@@ -447,7 +468,7 @@ def default_descriptions(component):
 
 def missing_fields(component):
     result = []
-    if description_length(component) < 160:
+    if description_length(component) < DESCRIPTION_MIN_LENGTH:
         result.append("description")
     if not has_screenshots(component):
         result.append("screenshots")
@@ -602,6 +623,13 @@ def merge_presentation(native, supplement, replace_screenshots=False):
     return changed
 
 
+def reviewed_native_metadata(local, candidates, native_id=""):
+    """Keep reviewed native metadata and safely fill its gaps from one match."""
+    if len(candidates) == 1:
+        merge_presentation(local, next(iter(candidates.values())))
+    return {local.findtext("id") or native_id: local}
+
+
 def apply_enrichment(root, repo, package_names, directory=None):
     """Apply reviewed presentation fixes to this repository's own components."""
     if directory is None:
@@ -724,7 +752,10 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                     r"store\.steampowered\.com/app/\d+",
                     screenshot_sources.get(name, {}).get("url", "")))
                 if url or has_reviewed_steam:
-                    jobs[cid] = (native, url, trusted_project_url)
+                    # Component IDs are not globally unique across packages or
+                    # repositories (for example, alternative builds may install
+                    # the same desktop file). Keep each upstream lookup distinct.
+                    jobs[(repo, name, cid)] = (native, url, trusted_project_url)
             print(f"{repo}: checking {len(jobs)} upstream projects for missing presentation data", flush=True)
         upstream_results = upstream_resolver.resolve_many(jobs) if jobs else {}
         for native in catalog.findall("component"):
@@ -781,9 +812,13 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 reason = "explicit-native-package"
             if len(local_metadata) == 1:
                 local = ET.parse(local_metadata[0]).getroot()
-                candidates = {local.findtext("id", cid): local}
+                # A reviewed native metainfo file is authoritative for its
+                # identity and text, but it may intentionally omit screenshots.
+                # Keep any unambiguous catalog match as a source of missing
+                # presentation fields instead of throwing it away here.
+                candidates = reviewed_native_metadata(local, candidates, cid)
                 reason = "reviewed-native-metainfo"
-            discovered = upstream_results.get(cid, {})
+            discovered = upstream_results.get((repo, name, cid), {})
             if (manual_screenshots.get("images") and
                     (force_screenshot_refresh or (not has_screenshots(native) and
                      not any(has_screenshots(candidate) for candidate in candidates.values())))):
@@ -796,7 +831,12 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 reason = "reviewed-upstream-screenshots"
             record = {"repository": repo, "package": name, "id": cid, "missing": missing}
             if discovered:
-                record["upstream_check"] = {key: value for key, value in discovered.items() if key not in ("paragraphs", "images")}
+                record["upstream_check"] = {
+                    key: value for key, value in discovered.items()
+                    if key not in ("paragraphs", "images")
+                }
+                record["upstream_check"]["description_candidates"] = len(discovered.get("paragraphs", []))
+                record["upstream_check"]["validated_screenshots"] = len(discovered.get("images", []))
             if discovered.get("status") == "found":
                 # First retain the catalog match, then fill its remaining gaps
                 # from the package's own project rather than another app's data.

@@ -60,6 +60,10 @@ python metadata_audit.py work/enrichment
 ```
 
 The report lists repository, package, component ID, missing fields, and the
-upstream lookup result. Filter it to cards without screenshots or descriptions
-with `--field screenshots` or `--field description`. CI prints the report after
-each catalog build and uploads the underlying audit JSON files as artifacts.
+upstream lookup result, including counts of description candidates and validated
+screenshots. A description under 120 characters is considered incomplete; useful
+short descriptions are kept out of the report, while longer source text can still
+replace them when another field triggers enrichment. Filter to cards without
+screenshots or descriptions with `--field screenshots` or `--field description`.
+CI prints the report after each catalog build and uploads the audit JSON files as
+artifacts.

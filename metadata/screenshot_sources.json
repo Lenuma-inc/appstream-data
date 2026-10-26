@@ -109,6 +109,16 @@
     "credit": "OdinTdh; screenshot gallery published on the pyLinuxWheel itch.io project page",
     "exclude_images": [
       "https://img.itch.zone/aW1hZ2UvNDY2NTk2LzIzODA3ODkucG5n/original/va%2FPCX.png"
+    ],
+    "images": [
+      {
+        "url": "https://img.itch.zone/aW1hZ2UvNDY2NTk2LzI4MDU2MzgucG5n/original/Q%2Bek8D.png",
+        "caption": "pyLinuxWheel steering wheel configuration"
+      },
+      {
+        "url": "https://img.itch.zone/aW1hZ2UvNDY2NTk2LzI4MDU2NDMucG5n/original/WAfcRQ.png",
+        "caption": "pyLinuxWheel profile editor"
+      }
     ]
   }
 }
