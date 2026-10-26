@@ -263,7 +263,7 @@ class UpstreamResolver:
         if host in ("github.com", "gitlab.com") and len(parts) < 2:
             return False
         if trusted_project_url:
-            return bool(parts[0] and parts[1])
+            return len(parts) >= 2 and bool(parts[0] and parts[1])
         project = parts[1] if host == "github.com" else parts[-1]
         if not project:
             return False

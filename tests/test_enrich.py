@@ -30,6 +30,13 @@ class EnrichmentTests(unittest.TestCase):
         self.assertFalse(resolver.supports(native, url))
         self.assertTrue(resolver.supports(native, url, trusted_project_url=True))
 
+    def test_trusted_project_url_without_project_path_is_rejected(self):
+        resolver = enrich.UpstreamResolver(tempfile.gettempdir())
+        native = component()
+
+        self.assertFalse(resolver.supports(
+            native, "https://project.itch.io/", trusted_project_url=True))
+
     def test_readme_finds_ui_images_with_neutral_filenames(self):
         paragraphs, images = enrich.readme_presentation(
             "# App\n\n![Modern style](repository/main-modern.png)\n\n"
