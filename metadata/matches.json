@@ -1,4 +1,10 @@
 {
+  "chromium": "org.chromium.Chromium",
+  "firefox-esr": "org.mozilla.firefox",
+  "firefox-nightly-bin": "org.mozilla.firefox",
+  "google-chrome": "com.google.Chrome",
+  "microsoft-edge-stable-bin": "com.microsoft.Edge",
+  "ungoogled-chromium-bin": "io.github.ungoogled_software.ungoogled_chromium",
   "anydesk-bin": "com.anydesk.Anydesk",
   "appflowy-bin": "io.appflowy.AppFlowy",
   "minecraft-launcher": "com.mojang.Minecraft",

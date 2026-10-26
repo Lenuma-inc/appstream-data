@@ -95,8 +95,58 @@ class ReadmeImages(HTMLParser):
             self.images.append((attrs["src"], attrs.get("alt", "")))
 
 
+class WebsitePresentation(HTMLParser):
+    """Extract explicit app descriptions and clearly labelled UI images."""
+    def __init__(self):
+        super().__init__()
+        self.paragraphs = []
+        self.images = []
+        self.main_depth = 0
+        self.capture = False
+        self.text = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "meta":
+            key = (attrs.get("name") or attrs.get("property") or "").casefold()
+            content = " ".join((attrs.get("content") or "").split())
+            if key in ("description", "og:description", "twitter:description") and content:
+                self.paragraphs.append(content)
+        if tag in ("main", "article"):
+            self.main_depth += 1
+        if self.main_depth and tag == "p":
+            self.capture, self.text = True, []
+        if tag != "img":
+            return
+        src = attrs.get("src") or attrs.get("data-src") or attrs.get("data-lazy-src")
+        label = " ".join((attrs.get(key) or "") for key in ("alt", "title", "class", "id", "data-caption"))
+        filename = Path(urlsplit(src or "").path).name
+        label += " " + filename
+        if src and SCREENSHOT_LABEL.search(label) and not re.search(
+                r"logo|badge|banner|shield|avatar|sponsor|donat", label, re.I):
+            self.images.append((src, attrs.get("alt") or attrs.get("title") or "Application interface"))
+
+    def handle_endtag(self, tag):
+        if tag == "p" and self.capture:
+            paragraph = " ".join("".join(self.text).split())
+            if 120 <= len(paragraph) <= 1800:
+                self.paragraphs.append(paragraph)
+            self.capture = False
+        if tag in ("main", "article") and self.main_depth:
+            self.main_depth -= 1
+
+    def handle_data(self, data):
+        if self.capture:
+            self.text.append(data)
+
+
 SCREENSHOT_LABEL = re.compile(
     r"screenshot|screen[-_ ]?shot|preview|overview|interface|main[-_ ]?window|(?:^|[\W_])ui(?:[\W_]|$)",
+    re.I,
+)
+WEBSITE_DOC_TEXT = re.compile(
+    r"\b(?:this site contains|learn to build|life of a .* developer|"
+    r"developer documentation|contributing code|checkout, build,? &? run)\b",
     re.I,
 )
 
@@ -199,16 +249,21 @@ class UpstreamResolver:
         except (OSError, ValueError, Image.DecompressionBombError):
             return None
 
-    def supports(self, component, url):
+    def supports(self, component, url, trusted_project_url=False):
         parsed = urlsplit(url)
         host = parsed.hostname or ""
         if parsed.scheme != "https":
             return False
         if host not in ("github.com", "gitlab.com") and not host.endswith(".itch.io"):
-            return component.find("categories/category[.='Game']") is not None
+            # Package databases often point directly to the project homepage.
+            # Crawl it for every app; WebsitePresentation accepts only explicit
+            # description metadata and images labelled as UI/screenshots.
+            return bool(host and host not in ("archlinux.org", "aur.archlinux.org"))
         parts = parsed.path.strip("/").split("/")
         if host in ("github.com", "gitlab.com") and len(parts) < 2:
             return False
+        if trusted_project_url:
+            return bool(parts[0] and parts[1])
         project = parts[1] if host == "github.com" else parts[-1]
         if not project:
             return False
@@ -265,12 +320,12 @@ class UpstreamResolver:
         return {"status": "found", "url": "https://store.steampowered.com/app/" + ids[0] + "/",
                 "project_url": project_url, "paragraphs": [], "images": images}
 
-    def resolve(self, component, url):
+    def resolve(self, component, url, trusted_project_url=False):
         package = component.findtext("pkgname", "")
         source = self.screenshot_sources.get(package, {})
         steam_url = source.get("url", "")
         has_steam_source = bool(re.search(r"store\.steampowered\.com/app/\d+", steam_url))
-        if not self.supports(component, url) and not has_steam_source:
+        if not self.supports(component, url, trusted_project_url) and not has_steam_source:
             return {"status": "no-supported-upstream", "url": url}
         parsed = urlsplit(url)
         source_url, paragraphs, candidates = url, [], []
@@ -297,6 +352,14 @@ class UpstreamResolver:
                     paragraphs, candidates = readme_presentation(content.decode("utf-8", errors="replace"))
                     candidates = [(urljoin(base, image), caption) for image, caption in candidates]
                     break
+        else:
+            content = self.fetch(url)
+            if content:
+                page = WebsitePresentation()
+                page.feed(content.decode("utf-8", errors="replace"))
+                paragraphs = [p for p in page.paragraphs
+                              if 120 <= len(p) <= 1800 and not WEBSITE_DOC_TEXT.search(p)][:2]
+                candidates = [(urljoin(url, image), caption) for image, caption in page.images]
         images, seen = [], set()
         for candidate, caption in candidates:
             candidate = urljoin(url, candidate)
@@ -317,13 +380,20 @@ class UpstreamResolver:
             if steam:
                 steam["paragraphs"] = paragraphs
                 return steam
-        return {"status": "found" if images or paragraphs else "upstream-has-no-presentation-data",
-                "url": source_url, "project_url": url, "paragraphs": paragraphs, "images": images}
+        result = {"status": "found" if images or paragraphs else "upstream-has-no-presentation-data",
+                  "url": source_url, "project_url": url, "paragraphs": paragraphs, "images": images}
+        if trusted_project_url:
+            result["url_source"] = "package-database"
+        return result
 
     def resolve_many(self, jobs):
         pending = {key: value for key, value in jobs.items() if key not in self.results}
         with ThreadPoolExecutor(max_workers=self.workers) as pool:
-            futures = {pool.submit(self.resolve, component, url): key for key, (component, url) in pending.items()}
+            futures = {}
+            for key, job in pending.items():
+                component, url = job[:2]
+                trusted_project_url = job[2] if len(job) > 2 else False
+                futures[pool.submit(self.resolve, component, url, trusted_project_url)] = key
             for future in as_completed(futures):
                 key = futures[future]
                 try:
@@ -532,40 +602,28 @@ def merge_presentation(native, supplement, replace_screenshots=False):
     return changed
 
 
-def apply_enrichment(root, repo, package_names, reference_names=(), directory=None):
-    """Apply reviewed snapshots; reference apps are served by the LunaOS catalog."""
+def apply_enrichment(root, repo, package_names, directory=None):
+    """Apply reviewed presentation fixes to this repository's own components."""
     if directory is None:
         return []
     sources_path = directory / "sources.json"
     sources = json.loads(sources_path.read_text()).get("components", {}) if sources_path.is_file() else {}
-    by_id = {c.findtext("id"): c for c in root.findall("component")}
-    native_packages = {p.text for c in root.findall("component") for p in c.findall("pkgname")}
     applied = []
-    repositories = [repo] + (["extra", "multilib", "core"] if repo == "lunaos-repo" else [])
-    for source_repo in repositories:
-        path = directory / f"{source_repo}.xml"
-        if not path.is_file():
+    path = directory / f"{repo}.xml"
+    if not path.is_file():
+        return applied
+    by_id = {c.findtext("id"): c for c in root.findall("component")}
+    for supplement in ET.parse(path).getroot().findall("component"):
+        name, cid = supplement.findtext("pkgname"), supplement.findtext("id")
+        if not name or not cid:
+            raise ValueError(f"Missing package/component ID in {path}")
+        native = by_id.get(cid)
+        if native is None or name not in package_names or native.findtext("pkgname") != name:
             continue
-        for supplement in ET.parse(path).getroot().findall("component"):
-            name, cid = supplement.findtext("pkgname"), supplement.findtext("id")
-            if not name or not cid:
-                raise ValueError(f"Missing package/component ID in {path}")
-            native = by_id.get(cid)
-            if source_repo == repo:
-                if native is None or name not in package_names or native.findtext("pkgname") != name:
-                    continue
-                fields = sources.get(f"{source_repo}/{cid}", {}).get("fields", [])
-                changed = merge_presentation(native, supplement, "refreshed-screenshots" in fields)
-            else:
-                if name not in reference_names or native is not None or name in native_packages:
-                    continue
-                native = copy.deepcopy(supplement)
-                root.append(native)
-                by_id[cid] = native
-                package_names.add(name)
-                changed = ["reference-supplement"]
-            if changed:
-                applied.append({"repository": source_repo, "package": name, "id": cid, "fields": changed})
+        fields = sources.get(f"{repo}/{cid}", {}).get("fields", [])
+        changed = merge_presentation(native, supplement, "refreshed-screenshots" in fields)
+        if changed:
+            applied.append({"repository": repo, "package": name, "id": cid, "fields": changed})
     return applied
 
 
@@ -643,7 +701,7 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 name, cid = native.findtext("pkgname"), native.findtext("id", "")
                 if native.get("type") != "desktop-application" or not name or not missing_fields(native):
                     continue
-                if name in explicit_matches or (ROOT / "metadata" / name / "usr/share/metainfo").is_dir():
+                if (ROOT / "metadata" / name / "usr/share/metainfo").is_dir():
                     continue
                 if name not in policy["keep_packages"] and any(fnmatch.fnmatchcase(name, p) for p in policy["exclude_packages"]):
                     continue
@@ -655,12 +713,18 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                     merge_presentation(proposed, next(iter(exact.values())))
                     if not missing_fields(proposed):
                         continue
-                url = native.findtext("url[@type='homepage']") or native_urls.get(name, "")
+                homepage_url = native.findtext("url[@type='homepage']") or ""
+                package_url = native_urls.get(name, "")
+                url, trusted_project_url = "", False
+                for candidate_url, trusted in ((homepage_url, False), (package_url, True)):
+                    if candidate_url and upstream_resolver.supports(native, candidate_url, trusted):
+                        url, trusted_project_url = candidate_url, trusted
+                        break
                 has_reviewed_steam = bool(re.search(
                     r"store\.steampowered\.com/app/\d+",
                     screenshot_sources.get(name, {}).get("url", "")))
-                if upstream_resolver.supports(native, url) or has_reviewed_steam:
-                    jobs[cid] = (native, url)
+                if url or has_reviewed_steam:
+                    jobs[cid] = (native, url, trusted_project_url)
             print(f"{repo}: checking {len(jobs)} upstream projects for missing presentation data", flush=True)
         upstream_results = upstream_resolver.resolve_many(jobs) if jobs else {}
         for native in catalog.findall("component"):

@@ -45,10 +45,13 @@ python generate.py package --enrichment-catalog work/enrichment/sources/flathub.
 Ambiguous identities and sources with no additional data are recorded in
 `audit.json`. Source catalog status is in
 `work/enrichment/sources/status.json`. A missing match is not permission to copy
-another application's screenshots. Reference packages from Arch are added to the LunaOS catalog only
-while present in the current reference databases; Arch-owned catalog files are
-not replaced. Pamac uses the repository order from pacman.conf, so LunaOS should
-precede Arch repositories, as in the LunaOS default configuration.
+another application's screenshots. Arch applications are supplied only by the
+independent `archlinux-appstream-data` package; they are no longer copied into
+the LunaOS catalog. This keeps each repository's component list separate and
+avoids duplicate application cards in Pamac. Arch catalogs are rebuilt from the
+current Arch AppStream data and enriched in place. Pamac uses the repository
+order from pacman.conf, so LunaOS should precede Arch repositories, as in the
+LunaOS default configuration.
 
 After generation, review all remaining gaps with:
 

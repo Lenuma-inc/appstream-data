@@ -443,7 +443,7 @@ def unpack_icons(archive_path, destination):
 
 
 def write_catalog(source, destination, priority, package_names, excluded_components=(),
-                  repo=None, reference_names=(), enrichment_report=None, enrichment_dir=None,
+                  repo=None, enrichment_report=None, enrichment_dir=None,
                   excluded_packages=()):
     with gzip.open(source, "rb") as stream:
         root = ET.parse(stream).getroot()
@@ -454,7 +454,7 @@ def write_catalog(source, destination, priority, package_names, excluded_compone
         if any(p.text in excluded_packages for p in component.findall("pkgname")):
             root.remove(component)
     if repo is not None:
-        applied = apply_enrichment(root, repo, package_names, reference_names, enrichment_dir)
+        applied = apply_enrichment(root, repo, package_names, enrichment_dir)
         if enrichment_report is not None:
             enrichment_report.extend(applied)
     origin = token(root.get("origin", ""))
@@ -578,20 +578,11 @@ def package_repo(repo, config, args):
         share = stage / "usr/share"
         catalog = share / "swcatalog/xml" / f"{repo}.xml.gz"
         names = {p["name"] for p in manifest["packages"]}
-        reference_names = set()
-        if repo == "lunaos-repo":
-            for database in sorted((args.work / "reference").glob("*.db")):
-                reference_names.update(database_names(database, manifest["architecture"]))
-            reference_names = {
-                name for name in reference_names
-                if name in args.policy_data["keep_packages"] or not any(
-                    fnmatch.fnmatchcase(name, pattern) for pattern in args.policy_data["exclude_packages"])
-            }
         enrichment_report = []
         try:
             origin, count = write_catalog(catalogs[0], catalog, config["priority"], names,
                                           args.policy_data["exclude_components"], repo,
-                                          reference_names, enrichment_report, enrichment_dir,
+                                          enrichment_report, enrichment_dir,
                                           args.shadowed_packages.get(repo, {}))
         finally:
             report = catalog.with_suffix(".validation.yaml")

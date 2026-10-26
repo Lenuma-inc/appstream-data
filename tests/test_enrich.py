@@ -22,6 +22,14 @@ def component(description="Short", screenshot=None, name="Example", cid="org.exa
 
 
 class EnrichmentTests(unittest.TestCase):
+    def test_package_database_github_url_can_differ_from_app_name(self):
+        resolver = enrich.UpstreamResolver(tempfile.gettempdir())
+        native = component(name="DisplayCAL", package="displaycal")
+        url = "https://github.com/eoyilmaz/displaycal-py3"
+
+        self.assertFalse(resolver.supports(native, url))
+        self.assertTrue(resolver.supports(native, url, trusted_project_url=True))
+
     def test_readme_finds_ui_images_with_neutral_filenames(self):
         paragraphs, images = enrich.readme_presentation(
             "# App\n\n![Modern style](repository/main-modern.png)\n\n"
@@ -62,6 +70,53 @@ class EnrichmentTests(unittest.TestCase):
 
             self.assertEqual(result["status"], "upstream-has-no-presentation-data")
             self.assertEqual(result["images"], [])
+
+    def test_website_resolver_extracts_description_and_labelled_screenshots(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            resolver = enrich.UpstreamResolver(temporary)
+            html = (b'<meta name="description" content="A useful application description that '
+                    b'is long enough to be meaningful for the software catalog and users, '
+                    b'explaining what the program does and who it is intended for.">'
+                    b'<img src="/media/main-window.png" alt="Application screenshot">'
+                    b'<img src="/assets/logo.png" alt="Application logo">')
+            resolver.fetch = lambda url, limit=512 * 1024: html
+            resolver.image = lambda url, caption: {
+                "url": url, "caption": caption, "width": 1280, "height": 720,
+            }
+
+            result = resolver.resolve(component(), "https://example.org/app")
+
+            self.assertEqual(result["status"], "found")
+            self.assertEqual(len(result["paragraphs"]), 1)
+            self.assertEqual([image["url"] for image in result["images"]],
+                             ["https://example.org/media/main-window.png"])
+
+    def test_website_resolver_uses_main_content_when_meta_description_is_missing(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            resolver = enrich.UpstreamResolver(temporary)
+            html = (b'<nav><p>Navigation text that should not be used as the app description.</p></nav>'
+                    b'<main><p>This is the application overview, with enough detail to explain '
+                    b'what the software does and help users decide whether it suits their needs. '
+                    b'The paragraph is intentionally longer than the minimum catalog description length.</p></main>')
+            resolver.fetch = lambda url, limit=512 * 1024: html
+            result = resolver.resolve(component(), "https://example.org/app")
+
+            self.assertEqual(result["status"], "found")
+            self.assertEqual(len(result["paragraphs"]), 1)
+            self.assertIn("application overview", result["paragraphs"][0])
+
+    def test_website_resolver_skips_project_documentation_as_app_description(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            resolver = enrich.UpstreamResolver(temporary)
+            html = (b'<main><p>This site contains design documents, architecture overviews, '
+                    b'testing information, and more to help you learn to build and work with '
+                    b'the source code for this project.</p></main>')
+            resolver.fetch = lambda url, limit=512 * 1024: html
+
+            result = resolver.resolve(component(), "https://example.org/project")
+
+            self.assertEqual(result["status"], "upstream-has-no-presentation-data")
+            self.assertEqual(result["paragraphs"], [])
 
     def test_native_identity_and_complete_data_are_preserved(self):
         native = component("Native description. " * 20, "https://native.example/screenshot.png")
@@ -163,20 +218,16 @@ class EnrichmentTests(unittest.TestCase):
         self.assertTrue(all(enrich.LANG not in child.attrib for description in data.findall("description")
                             for child in description.iter() if child is not description))
 
-    def test_reference_supplement_requires_available_package_and_keeps_native_id(self):
+    def test_arch_reference_components_are_not_added_to_lunaos_catalog(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             extra = ET.Element("components")
             extra.append(component(package="discord", cid="discord.desktop"))
             ET.ElementTree(extra).write(directory / "extra.xml")
             native = ET.Element("components")
-            self.assertEqual(enrich.apply_enrichment(native, "lunaos-repo", set(), set(), directory), [])
-            names = set()
-            result = enrich.apply_enrichment(native, "lunaos-repo", names, {"discord"}, directory)
-            self.assertEqual(len(result), 1)
-            self.assertEqual(native.findtext("component/id"), "discord.desktop")
-            self.assertEqual(names, {"discord"})
-            self.assertEqual(enrich.apply_enrichment(native, "lunaos-repo", names, {"discord"}, directory), [])
+            result = enrich.apply_enrichment(native, "lunaos-repo", set(), directory)
+            self.assertEqual(result, [])
+            self.assertEqual(len(native), 0)
 
     def test_reference_does_not_add_second_component_for_native_package(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -186,7 +237,7 @@ class EnrichmentTests(unittest.TestCase):
             ET.ElementTree(extra).write(directory / "multilib.xml")
             native = ET.Element("components")
             native.append(component(package="steam", cid="steam.desktop"))
-            result = enrich.apply_enrichment(native, "lunaos-repo", {"steam"}, {"steam"}, directory)
+            result = enrich.apply_enrichment(native, "lunaos-repo", {"steam"}, directory)
             self.assertEqual(result, [])
             self.assertEqual(len(native), 1)
 
@@ -248,6 +299,73 @@ class EnrichmentTests(unittest.TestCase):
             self.assertEqual(result.findtext(".//image"), "https://example.org/vscodium.png")
             self.assertEqual(audit["source_id"], "com.vscodium.codium")
             self.assertEqual(audit["match"], "explicit-native-package")
+
+    def test_browser_packages_use_their_flathub_ids_and_keep_native_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            catalogs = directory / "xml"
+            catalogs.mkdir()
+            native_components = []
+            flatpak_components = []
+            cases = (
+                ("chromium", "chromium.desktop", "org.chromium.Chromium", "Chromium"),
+                ("google-chrome", "google-chrome.desktop", "com.google.Chrome", "Google Chrome"),
+                ("ungoogled-chromium-bin", "chromium.desktop",
+                 "io.github.ungoogled_software.ungoogled_chromium", "Ungoogled Chromium"),
+                ("microsoft-edge-stable-bin", "microsoft-edge.desktop",
+                 "com.microsoft.Edge", "Microsoft Edge"),
+            )
+            for package, cid, flatpak_id, display_name in cases:
+                native = component(cid=cid, package=package, name=display_name)
+                ET.SubElement(native, "url", type="homepage").text = "https://example.org/" + package
+                native_components.append(native)
+                flatpak_components.append(component(
+                    "A browser description from the upstream application catalog. " * 4,
+                    "https://flathub.example/" + package + ".png",
+                    cid=flatpak_id,
+                    package=flatpak_id,
+                    name=display_name,
+                ))
+
+            for path, items in (
+                (catalogs / "chaotic-aur.xml.gz", native_components),
+                (directory / "flathub.xml.gz", flatpak_components),
+            ):
+                root = ET.Element("components", version="1.0")
+                root.extend(items)
+                path.write_bytes(gzip.compress(ET.tostring(root)))
+
+            class Resolver:
+                def supports(self, native, url, trusted_project_url=False):
+                    return True
+
+                def resolve_many(self, jobs):
+                    return {
+                        cid: {
+                            "status": "found",
+                            "url": "https://www.google.com/chrome/",
+                            "project_url": "https://www.google.com/chrome/",
+                            "paragraphs": ["Google Chrome helps you browse the web with speed, security, and useful tools. " * 4],
+                            "images": [],
+                        }
+                        for cid in jobs
+                    }
+
+            enrich.import_catalogs(
+                catalogs, directory / "flathub.xml.gz", directory / "output",
+                directory / "no-databases", upstream_resolver=Resolver(),
+            )
+
+            output = ET.parse(directory / "output/chaotic-aur.xml").getroot()
+            by_package = {item.findtext("pkgname"): item for item in output.findall("component")}
+            audit = {item["package"]: item for item in
+                     json.loads((directory / "output/audit.json").read_text())}
+            for package, cid, flatpak_id, _ in cases:
+                self.assertEqual(by_package[package].findtext("id"), cid)
+                self.assertIn("flathub.example", by_package[package].findtext(".//image"))
+                self.assertEqual(audit[package]["source_id"], flatpak_id)
+                self.assertIn("explicit-native-package", audit[package]["match"])
+            self.assertGreater(enrich.description_length(by_package["google-chrome"]), 160)
 
 
 if __name__ == "__main__":
