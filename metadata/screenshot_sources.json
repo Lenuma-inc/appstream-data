@@ -36,6 +36,70 @@
       }
     ]
   },
+  "lemonade-desktop": {
+    "url": "https://www.amd.com/en/developer/resources/technical-articles/2026/lemonade-for-local-ai.html",
+    "credit": "Lemonade App screenshots published by AMD",
+    "images": [
+      {
+        "url": "https://www.amd.com/content/dam/amd/en/images/blogs/designs/technical-blogs/lemonade-sdk/lemonadeapp.png",
+        "caption": "Lemonade App with a local language model loaded"
+      },
+      {
+        "url": "https://www.amd.com/content/dam/amd/en/images/blogs/designs/technical-blogs/lemonade-sdk/lemonadeappsdclear.png",
+        "caption": "Generating an image with Lemonade App"
+      }
+    ]
+  },
+  "lemonade-server": {
+    "url": "https://developer.amd.com/playbooks/lemonade-getting-started/",
+    "credit": "Lemonade web interface screenshots published by AMD",
+    "images": [
+      {
+        "url": "https://developer.amd.com/playbooks/_astro/ChatwithLogs.Cl3LJgv8.png",
+        "caption": "Lemonade interface showing server logs"
+      },
+      {
+        "url": "https://developer.amd.com/playbooks/_astro/multi_modality.BimVmitL.png",
+        "caption": "Lemonade web interface with multimodal features"
+      }
+    ]
+  },
+  "shelly": {
+    "url": "https://www.seafoam-labs.org/shelly-alpm/overview/",
+    "credit": "Seafoam Labs Shelly documentation",
+    "images": [
+      {
+        "url": "https://www.seafoam-labs.org/_astro/shelly-packages.D6wfl3so_ZGbHas.webp",
+        "caption": "Browsing Arch packages in Shelly"
+      },
+      {
+        "url": "https://www.seafoam-labs.org/_astro/Package_Listing.llMyvlhL_Z1o83a2.webp",
+        "caption": "Searching and filtering packages in Shelly"
+      }
+    ]
+  },
+  "xodus-nexus-bin": {
+    "url": "https://github.com/domsvoboda/xodus-nexus/",
+    "credit": "Xodus Nexus contributors",
+    "images": [
+      {
+        "url": "https://raw.githubusercontent.com/domsvoboda/xodus-nexus/main/docs/screenshots/demo-library.png",
+        "caption": "Game library with owned and installed games"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/domsvoboda/xodus-nexus/main/docs/screenshots/demo-store.png",
+        "caption": "Browsing the Microsoft Store"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/domsvoboda/xodus-nexus/main/docs/screenshots/demo-downloads.png",
+        "caption": "Game installation queue"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/domsvoboda/xodus-nexus/main/docs/screenshots/demo-settings.png",
+        "caption": "Xodus Nexus settings"
+      }
+    ]
+  },
   "alvr": {
     "url": "https://store.steampowered.com/app/3312710/",
     "credit": "ALVR contributors; Steam store metadata and screenshots"

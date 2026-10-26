@@ -23,6 +23,16 @@ class RepositoryPolicyTests(unittest.TestCase):
         self.assertIn("discover_overlay_configure.desktop", policy["exclude_components"])
         self.assertNotIn("discover_overlay.desktop", policy["exclude_components"])
 
+    def test_zenmap_root_launcher_is_hidden_without_excluding_zenmap(self):
+        policy = load_policy(ROOT / "policy.json")
+        self.assertIn("zenmap-root.desktop", policy["exclude_components"])
+        self.assertNotIn("zenmap.desktop", policy["exclude_components"])
+
+    def test_nwg_readme_viewer_is_hidden_without_excluding_nwg_shell(self):
+        policy = load_policy(ROOT / "policy.json")
+        self.assertIn("nwg-readme.desktop", policy["exclude_components"])
+        self.assertNotIn("nwg-shell", policy["exclude_packages"])
+
 
 if __name__ == "__main__":
     unittest.main()

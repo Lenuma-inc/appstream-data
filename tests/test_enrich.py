@@ -22,6 +22,47 @@ def component(description="Short", screenshot=None, name="Example", cid="org.exa
 
 
 class EnrichmentTests(unittest.TestCase):
+    def test_readme_finds_ui_images_with_neutral_filenames(self):
+        paragraphs, images = enrich.readme_presentation(
+            "# App\n\n![Modern style](repository/main-modern.png)\n\n"
+            "![Settings][settings]\n\n[settings]: repository/settings-classic.png\n")
+        self.assertEqual(paragraphs, [])
+        self.assertEqual(images, [
+            ("repository/main-modern.png", "Modern style"),
+            ("repository/settings-classic.png", "Settings"),
+        ])
+
+    def test_resolver_accepts_large_unlabelled_readme_interface_image(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            resolver = enrich.UpstreamResolver(temporary)
+            readme = b"# Example\n\n![Image](repository/main-modern.png)\n"
+            resolver.fetch = lambda url, limit=512 * 1024: readme if url.endswith("README.md") else None
+            resolver.image = lambda url, caption: {
+                "url": url, "caption": caption, "width": 1280, "height": 720,
+            }
+
+            result = resolver.resolve(
+                component(name="example"), "https://github.com/example/example")
+
+            self.assertEqual(result["status"], "found")
+            self.assertEqual(result["images"][0]["url"],
+                             "https://raw.githubusercontent.com/example/example/HEAD/repository/main-modern.png")
+
+    def test_resolver_rejects_small_unlabelled_readme_images(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            resolver = enrich.UpstreamResolver(temporary)
+            resolver.fetch = lambda url, limit=512 * 1024: (
+                b"# Example\n\n![Image](assets/illustration.png)\n" if url.endswith("README.md") else None)
+            resolver.image = lambda url, caption: {
+                "url": url, "caption": caption, "width": 500, "height": 500,
+            }
+
+            result = resolver.resolve(
+                component(name="example"), "https://github.com/example/example")
+
+            self.assertEqual(result["status"], "upstream-has-no-presentation-data")
+            self.assertEqual(result["images"], [])
+
     def test_native_identity_and_complete_data_are_preserved(self):
         native = component("Native description. " * 20, "https://native.example/screenshot.png")
         ET.SubElement(native, "project_license").text = "MIT"
@@ -165,6 +206,48 @@ class EnrichmentTests(unittest.TestCase):
             enrich.import_catalogs(catalogs, directory / "flathub.xml.gz", directory / "output", directory / "no-databases")
             audit = json.loads((directory / "output/audit.json").read_text())
             self.assertEqual(audit[0]["status"], "needs-upstream-review")
+
+    def test_vscodium_wayland_uses_the_appstream_match_instead_of_its_readme(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            catalogs = directory / "xml"
+            catalogs.mkdir()
+            native = component(
+                "This is not a fork. " * 4,
+                cid="vscodium-wayland.desktop",
+                package="vscodium",
+                name="VSCodium - Wayland",
+            )
+            upstream = component(
+                "VSCodium combines the simplicity of a code editor with tools for the core edit-build-debug cycle. " * 4,
+                "https://example.org/vscodium.png",
+                cid="com.vscodium.codium",
+                package="com.vscodium.codium",
+                name="VSCodium",
+            )
+            for filename, item in (
+                (catalogs / "chaotic-aur.xml.gz", native),
+                (directory / "flathub.xml.gz", upstream),
+            ):
+                root = ET.Element("components", version="1.0")
+                root.append(item)
+                filename.write_bytes(gzip.compress(ET.tostring(root)))
+
+            enrich.import_catalogs(
+                catalogs,
+                directory / "flathub.xml.gz",
+                directory / "output",
+                directory / "no-databases",
+            )
+
+            result = ET.parse(directory / "output/chaotic-aur.xml").getroot().find("component")
+            audit = json.loads((directory / "output/audit.json").read_text())[0]
+            self.assertEqual(result.findtext("id"), "vscodium-wayland.desktop")
+            self.assertEqual(result.findtext("pkgname"), "vscodium")
+            self.assertIn("core edit-build-debug cycle", result.findtext("description/p"))
+            self.assertEqual(result.findtext(".//image"), "https://example.org/vscodium.png")
+            self.assertEqual(audit["source_id"], "com.vscodium.codium")
+            self.assertEqual(audit["match"], "explicit-native-package")
 
 
 if __name__ == "__main__":

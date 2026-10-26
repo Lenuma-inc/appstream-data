@@ -8,6 +8,7 @@ on:
     paths:
       - 'generate.py'
       - 'enrich.py'
+      - 'metadata_audit.py'
       - 'compare-catalogs.py'
       - 'catalog_sources.json'
       - 'tests/**'
@@ -58,6 +59,8 @@ jobs:
         run: |
           runuser -u builder -- python generate.py all --explain \
             --version "$(sed -n 's/^pkgver=//p' PKGBUILD)"
+      - name: Report apps with incomplete metadata
+        run: runuser -u builder -- python metadata_audit.py work/enrichment
       - name: Finalize source checksums
         run: runuser -u builder -- python update-version.py --finalize
       - name: Detect AppStream catalog changes

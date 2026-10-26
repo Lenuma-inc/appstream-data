@@ -5,5 +5,8 @@
   "onlyoffice-bin": "org.onlyoffice.desktopeditors",
   "snoop": "de.philippun1.Snoop",
   "spotify": "com.spotify.Client",
+  "vscodium": "com.vscodium.codium",
+  "zenmap": "org.nmap.Zenmap",
+  "zen-browser-bin": "app.zen_browser.zen",
   "zotero": "org.zotero.Zotero"
 }

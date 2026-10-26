@@ -95,19 +95,37 @@ class ReadmeImages(HTMLParser):
             self.images.append((attrs["src"], attrs.get("alt", "")))
 
 
+SCREENSHOT_LABEL = re.compile(
+    r"screenshot|screen[-_ ]?shot|preview|overview|interface|main[-_ ]?window|(?:^|[\W_])ui(?:[\W_]|$)",
+    re.I,
+)
+
+
 def readme_presentation(text):
     images = [(url, alt) for alt, url in re.findall(r'!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)', text)]
+    references = {label.casefold(): url for label, url in re.findall(
+        r"(?m)^\s*\[([^\]]+)\]:\s*<?([^\s>]+)>?(?:\s+['\"(].*?)?$", text)}
+    for alt, reference in re.findall(r"!\[([^\]]*)\]\[([^\]]*)\]", text):
+        url = references.get((reference or alt).casefold())
+        if url:
+            images.append((url, alt))
     html = ReadmeImages()
     html.feed(text)
     images.extend(html.images)
-    screenshots = []
+    screenshots, seen = [], set()
     for url, alt in images:
+        if url in seen:
+            continue
+        seen.add(url)
         filename = Path(urlsplit(url).path).name
         label = filename + " " + alt
         if re.search(r"logo|badge|banner|shield|avatar|sponsor|donat", label, re.I):
             continue
-        if re.search(r"screenshot|screen[-_ ]?shot|preview|overview|interface|main[-_ ]?window|(?:^|[\W_])ui(?:[\W_]|$)", label, re.I):
-            screenshots.append((url, alt or "Application interface"))
+        # READMEs often show the actual app UI under neutral names such as
+        # main.png or modern.png. Keep those as candidates too; image() checks
+        # dimensions and the resolver applies a stricter size/aspect filter to
+        # candidates without a screenshot-like filename or caption.
+        screenshots.append((url, alt or "Application interface"))
     text = re.sub(r"```.*?```", "", text, flags=re.S)
     paragraphs = []
     for paragraph in re.split(r"\n\s*\n", text):
@@ -256,6 +274,7 @@ class UpstreamResolver:
             return {"status": "no-supported-upstream", "url": url}
         parsed = urlsplit(url)
         source_url, paragraphs, candidates = url, [], []
+        from_readme = False
         if (parsed.hostname or "").endswith(".itch.io"):
             content = self.fetch(url)
             if content:
@@ -274,6 +293,7 @@ class UpstreamResolver:
                 source_url = base + filename
                 content = self.fetch(source_url)
                 if content:
+                    from_readme = True
                     paragraphs, candidates = readme_presentation(content.decode("utf-8", errors="replace"))
                     candidates = [(urljoin(base, image), caption) for image, caption in candidates]
                     break
@@ -284,6 +304,10 @@ class UpstreamResolver:
                 continue
             seen.add(candidate)
             image = self.image(candidate, caption)
+            label = Path(urlsplit(candidate).path).name + " " + caption
+            if image and from_readme and not SCREENSHOT_LABEL.search(label) and (
+                    image["width"] < 640 or image["width"] / image["height"] < 1.25):
+                continue
             if image:
                 images.append(image)
             if len(images) == 4:

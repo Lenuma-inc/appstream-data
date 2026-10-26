@@ -49,3 +49,14 @@ another application's screenshots. Reference packages from Arch are added to the
 while present in the current reference databases; Arch-owned catalog files are
 not replaced. Pamac uses the repository order from pacman.conf, so LunaOS should
 precede Arch repositories, as in the LunaOS default configuration.
+
+After generation, review all remaining gaps with:
+
+```sh
+python metadata_audit.py work/enrichment
+```
+
+The report lists repository, package, component ID, missing fields, and the
+upstream lookup result. Filter it to cards without screenshots or descriptions
+with `--field screenshots` or `--field description`. CI prints the report after
+each catalog build and uploads the underlying audit JSON files as artifacts.
