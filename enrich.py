@@ -890,6 +890,7 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 # Reference components are appended to a different catalog origin.
                 # Bundle their native icons under that origin as well.
                 cached = []
+                reference_icons = icon_dir / origin
                 for icon in supplement.findall("icon"):
                     if icon.get("type") != "cached":
                         continue
@@ -899,7 +900,7 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                     filename = icon.text or ""
                     if Path(filename).name != filename:
                         raise ValueError(f"Unsafe icon filename: {filename}")
-                    source = icon_dir / origin / size / filename
+                    source = reference_icons / size / filename
                     if source.is_file():
                         filename = f"{repo}_{filename}"
                         target = output / "icons" / size / filename
@@ -907,9 +908,15 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                         shutil.copyfile(source, target)
                         icon.text = filename
                         cached.append(icon)
-                    else:
+                    elif reference_icons.is_dir() or not filename:
                         supplement.remove(icon)
-                if not any(i.get("height") == "64" and i.get("scale", "1") == "1" for i in cached):
+                    else:
+                        # Without a reference icon tree (for example when
+                        # enriching a local catalog snapshot), keep the native
+                        # icon reference instead of discarding the component.
+                        cached.append(icon)
+                if not any(i.get("height", "64") == "64" and i.get("scale", "1") == "1"
+                           for i in cached):
                     record["status"] = "needs-native-icon"
                     audit.append(record)
                     continue
