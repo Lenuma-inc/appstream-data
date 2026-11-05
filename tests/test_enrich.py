@@ -467,6 +467,44 @@ class EnrichmentTests(unittest.TestCase):
             self.assertEqual(audit["source_id"], "com.vscodium.codium")
             self.assertEqual(audit["match"], "explicit-native-package")
 
+    def test_julia_uses_reviewed_metainfo_not_the_screensaver(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            catalogs = directory / "xml"
+            catalogs.mkdir()
+            native = component(cid="julia.desktop", package="julia", name="Julia")
+            ET.SubElement(native, "url", type="homepage").text = "https://julialang.org/"
+            ET.SubElement(native, "icon", type="cached").text = "julia.png"
+            decoy = component(
+                "Julia fractal screensaver for the XScreenSaver collection. " * 4,
+                "https://example.org/xscreensaver-julia.png",
+                cid="xscreensaver-julia.desktop",
+                package="xscreensaver",
+                name="Julia",
+            )
+            native_root = ET.Element("components")
+            native_root.append(native)
+            (catalogs / "extra.xml.gz").write_bytes(gzip.compress(ET.tostring(native_root)))
+            snapshot = directory / "flathub.xml.gz"
+            snapshot_root = ET.Element("components")
+            snapshot_root.append(decoy)
+            snapshot.write_bytes(gzip.compress(ET.tostring(snapshot_root)))
+
+            enrich.import_catalogs(
+                catalogs, snapshot, directory / "output", directory / "no-databases")
+
+            result = ET.parse(directory / "output/extra.xml").getroot().find("component")
+            audit = json.loads((directory / "output/audit.json").read_text())[0]
+            description = "".join(result.find("description").itertext()).lower()
+            self.assertEqual(result.findtext("id"), "julia.desktop")
+            self.assertEqual(result.findtext("pkgname"), "julia")
+            self.assertIn("high-level, high-performance dynamic programming language",
+                          result.findtext("description/p"))
+            self.assertEqual(result.findtext(".//image"),
+                             "https://julialang.org/assets/images/julia-gnome.png")
+            self.assertNotIn("screensaver", description)
+            self.assertEqual(audit["match"], "reviewed-native-metainfo")
+
     def test_browser_packages_use_their_flathub_ids_and_keep_native_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

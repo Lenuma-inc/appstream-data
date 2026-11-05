@@ -133,5 +133,11 @@
     "credit": "ACross upstream interface screenshots",
     "metadata_license": "CC0-1.0",
     "changes": "Original factual description written for the native package from the reviewed upstream documentation. Native identity, launchers, icons and application license are preserved; upstream media retain their own licenses."
+  },
+  "julia": {
+    "url": "https://raw.githubusercontent.com/JuliaLang/julia/06c1d18d3c87974d79cdb5db4ad4e656ce72d515/contrib/julia.appdata.xml",
+    "credit": "JuliaLang contributors",
+    "metadata_license": "CC-BY-SA-3.0",
+    "changes": "Official upstream AppStream metadata; native identity, launchers, icons and application license are preserved. The screenshot references the official project asset."
   }
 }
