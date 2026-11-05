@@ -10,7 +10,9 @@ desktop IDs differ. These mappings cover renamed IDs (for example, DBeaver
 Community and Thunderbird) and legacy desktop-file IDs as well as Spotify,
 AnyDesk, AppFlowy, Zotero, ONLYOFFICE, Minecraft Launcher and Snoop. Only reviewed
 identities are mapped: a shared package or similar name does not make a suite's
-helper, a different edition or an unrelated fork the same application.
+helper, a different edition or an unrelated fork the same application. A `null`
+value suppresses catalog matching for a package whose name collides with an
+unrelated component; project-page discovery still applies.
 
 The remaining per-package files are fallback metainfo or icon resources absent
 from the automatically matched catalogs. This includes the Craft applications,

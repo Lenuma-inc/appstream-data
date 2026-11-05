@@ -808,8 +808,16 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
                 candidates = indexes["id"].get(normalize("com.discordapp.Discord"), {})
                 reason = "explicit-discord-variant"
             if name in explicit_matches:
-                candidates = indexes["id"].get(normalize(explicit_matches[name]), {})
-                reason = "explicit-native-package"
+                explicit_match = explicit_matches[name]
+                if explicit_match:
+                    candidates = indexes["id"].get(normalize(explicit_match), {})
+                    reason = "explicit-native-package"
+                else:
+                    # A null entry suppresses catalog matching for packages whose
+                    # name collides with an unrelated component. Project-page
+                    # discovery can still supply the package's own presentation.
+                    candidates = {}
+                    reason = "explicit-no-upstream-match"
             if len(local_metadata) == 1:
                 local = ET.parse(local_metadata[0]).getroot()
                 # A reviewed native metainfo file is authoritative for its

@@ -21,6 +21,7 @@
   "gtkwave-gtk3-tcl": "io.github.gtkwave.GTKWave",
   "ipscan": "org.angryip.ipscan",
   "js8call": "com.js8call.JS8Call",
+  "julia": null,
   "kobodeluxe": "net.olofson.KoboDeluxe",
   "kopia-ui-bin": "io.kopia.KopiaUI",
   "mame": "org.mamedev.MAME",
