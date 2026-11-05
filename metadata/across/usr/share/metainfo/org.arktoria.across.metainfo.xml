@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<component type="desktop-application">
+  <id>org.arktoria.across</id>
+  <name>ACross</name>
+  <summary>Manage proxy profiles and connections</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <url type="homepage">https://github.com/ArkToria/ACross</url>
+  <description>
+    <p>ACross is a graphical client for organizing proxy connection profiles. Profiles can be arranged in local groups or subscriptions, with controls to create entries, copy settings and display QR codes.</p>
+    <p>The settings interface provides local SOCKS5 and HTTP listener configuration, log controls and selectable interface themes.</p>
+  </description>
+</component>

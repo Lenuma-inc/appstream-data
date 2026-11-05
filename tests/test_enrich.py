@@ -22,6 +22,75 @@ def component(description="Short", screenshot=None, name="Example", cid="org.exa
 
 
 class EnrichmentTests(unittest.TestCase):
+    def test_reviewed_catalog_aliases_preserve_native_identity(self):
+        cases = (
+            ("dbeaver", "io.dbeaver.DBeaver", "io.dbeaver.DBeaverCommunity"),
+            ("netbeans", "netbeans.desktop", "org.apache.netbeans.desktop"),
+            ("praat", "praat.desktop", "org.praat.Praat"),
+            ("thunderbird", "net.thunderbird.Thunderbird", "org.mozilla.thunderbird"),
+            ("synology-drive", "synology-drive.desktop", "com.synology.SynologyDrive"),
+            ("squiid", "squiid.desktop", "net.imaginaryinfinity.Squiid"),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            catalogs = directory / "xml"
+            catalogs.mkdir()
+            native_root = ET.Element("components")
+            upstream_root = ET.Element("components")
+            for package, native_id, source_id in cases:
+                native = component(cid=native_id, package=package, name=package)
+                ET.SubElement(native, "project_license").text = "MIT"
+                ET.SubElement(native, "icon", type="cached").text = package + ".png"
+                native_root.append(native)
+                upstream_root.append(component(
+                    description="Reviewed catalog description with useful application details. " * 4,
+                    screenshot=f"https://example.org/{package}.png",
+                    cid=source_id, package=source_id, name="Different catalog name"))
+            (catalogs / "extra.xml.gz").write_bytes(gzip.compress(ET.tostring(native_root)))
+            snapshot = directory / "flathub.xml.gz"
+            snapshot.write_bytes(gzip.compress(ET.tostring(upstream_root)))
+            output = directory / "output"
+            enrich.import_catalogs(catalogs, snapshot, output, directory / "no-databases")
+            results = {item.findtext("pkgname"): item for item in ET.parse(output / "extra.xml").getroot()}
+            audits = {item["package"]: item for item in json.loads((output / "audit.json").read_text())}
+            for package, native_id, source_id in cases:
+                with self.subTest(package=package):
+                    result = results[package]
+                    self.assertEqual(result.findtext("id"), native_id)
+                    self.assertEqual(result.findtext("launchable"), native_id + ".desktop")
+                    self.assertEqual(result.findtext("project_license"), "MIT")
+                    self.assertEqual(result.findtext("icon"), package + ".png")
+                    self.assertEqual(audits[package]["source_id"], source_id)
+                    self.assertEqual(audits[package]["remaining"], [])
+
+    def test_reviewed_manual_descriptions_and_screenshots(self):
+        cases = (
+            ("across", "org.arktoria.across", 2),
+            ("heimer", "heimer.desktop", 1),
+            ("efibooteditor", "EFIBootEditor", 3),
+            ("libation", "libation.desktop", 0),
+            ("openbangla-keyboard", "openbangla-keyboard.desktop", 0),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            catalogs = directory / "xml"
+            catalogs.mkdir()
+            root = ET.Element("components")
+            for package, native_id, _ in cases:
+                root.append(component(cid=native_id, package=package))
+            (catalogs / "chaotic-aur.xml.gz").write_bytes(gzip.compress(ET.tostring(root)))
+            snapshot = directory / "flathub.xml.gz"
+            snapshot.write_bytes(gzip.compress(b"<components/>"))
+            output = directory / "output"
+            enrich.import_catalogs(catalogs, snapshot, output, directory / "no-databases")
+            results = {item.findtext("pkgname"): item for item in ET.parse(output / "chaotic-aur.xml").getroot()}
+            for package, native_id, image_count in cases:
+                with self.subTest(package=package):
+                    result = results[package]
+                    self.assertEqual(result.findtext("id"), native_id)
+                    self.assertNotIn("description", enrich.missing_fields(result))
+                    self.assertEqual(len(result.findall(".//screenshot/image")), image_count)
+
     def test_package_database_github_url_can_differ_from_app_name(self):
         resolver = enrich.UpstreamResolver(tempfile.gettempdir())
         native = component(name="DisplayCAL", package="displaycal")

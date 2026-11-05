@@ -6,12 +6,18 @@ are stored in `work/enrichment/` and uploaded as CI artifacts; they are not
 maintained in this directory.
 
 `matches.json` records explicit native-package-to-Flathub IDs where names or
-desktop IDs differ. These small mappings replace copied Flathub metainfo files
-for Spotify, AnyDesk, AppFlowy, Zotero, ONLYOFFICE, Minecraft Launcher and Snoop.
+desktop IDs differ. These mappings cover renamed IDs (for example, DBeaver
+Community and Thunderbird) and legacy desktop-file IDs as well as Spotify,
+AnyDesk, AppFlowy, Zotero, ONLYOFFICE, Minecraft Launcher and Snoop. Only reviewed
+identities are mapped: a shared package or similar name does not make a suite's
+helper, a different edition or an unrelated fork the same application.
 
 The remaining per-package files are fallback metainfo or icon resources absent
 from the automatically matched catalogs. This includes the Craft applications,
 spotify-qt, Discord Chat Exporter, Terasology and the Minecraft launcher icon.
+Reviewed descriptions also cover ACross, Heimer, EFI Boot Editor, Libation and
+OpenBangla Keyboard where automatic project-page discovery did not find useful
+text. ACross, Heimer and EFI Boot Editor have reviewed, commit-pinned screenshots.
 `sources.json` records their provenance and the licenses declared for the
 supplemental metadata. Referenced images retain their upstream licenses.
 

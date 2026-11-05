@@ -120,5 +120,47 @@
         "caption": "pyLinuxWheel profile editor"
       }
     ]
+  },
+  "heimer": {
+    "url": "https://github.com/juzzlin/Heimer/blob/065adfab3119bd02d8155968e7557a1f8e2bca66/README.md",
+    "credit": "Jussi Lind and Heimer contributors; screenshots licensed CC-BY-SA-3.0",
+    "images": [
+      {
+        "url": "https://raw.githubusercontent.com/juzzlin/Heimer/065adfab3119bd02d8155968e7557a1f8e2bca66/screenshots/4.4.0/Heimer.png",
+        "caption": "Heimer mind map editor"
+      }
+    ]
+  },
+  "across": {
+    "url": "https://github.com/ArkToria/ACross/blob/e0d25317ec47815280fb53dec5b745b61c02bc9e/misc/screenshots/README.md",
+    "credit": "ACross project screenshot gallery",
+    "images": [
+      {
+        "url": "https://raw.githubusercontent.com/ArkToria/ACross/e0d25317ec47815280fb53dec5b745b61c02bc9e/misc/screenshots/light_home_page.png",
+        "caption": "ACross connection profiles in the light theme"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/ArkToria/ACross/e0d25317ec47815280fb53dec5b745b61c02bc9e/misc/screenshots/light_setting_page.png",
+        "caption": "ACross listener and application settings"
+      }
+    ]
+  },
+  "efibooteditor": {
+    "url": "https://github.com/Neverous/efibooteditor/blob/1cd520fbe3a5770bdbe8894c3a2033d2c1573190/README.md",
+    "credit": "EFI Boot Editor project screenshots",
+    "images": [
+      {
+        "url": "https://raw.githubusercontent.com/Neverous/efibooteditor/1cd520fbe3a5770bdbe8894c3a2033d2c1573190/doc/efibooteditor.png",
+        "caption": "EFI Boot Editor boot entry configuration"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/Neverous/efibooteditor/1cd520fbe3a5770bdbe8894c3a2033d2c1573190/doc/filepathdialog.png",
+        "caption": "EFI device path editor"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/Neverous/efibooteditor/1cd520fbe3a5770bdbe8894c3a2033d2c1573190/doc/hotkeysdialog.png",
+        "caption": "EFI boot option hot keys"
+      }
+    ]
   }
 }

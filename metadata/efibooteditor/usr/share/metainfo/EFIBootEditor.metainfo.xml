@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<component type="desktop-application">
+  <id>EFIBootEditor</id>
+  <name>EFI Boot Editor</name>
+  <summary>View and edit UEFI boot configuration</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <url type="homepage">https://github.com/Neverous/efibooteditor</url>
+  <description>
+    <p>EFI Boot Editor provides a graphical interface for viewing and editing the boot configuration of UEFI-based systems, including boot entries and their file paths.</p>
+    <p>A command-line interface can export the configuration to a file, dump raw EFI data and import configuration from JSON for backup and restore workflows.</p>
+  </description>
+</component>

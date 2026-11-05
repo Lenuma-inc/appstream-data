@@ -103,5 +103,35 @@
     "credit": "MovingBlocks and Terasology contributors; supplemental description by LunaOS contributors",
     "metadata_license": "CC0-1.0",
     "changes": "Authored native metainfo based on the official project website; screenshots reference the official gallery and retain upstream media licenses."
+  },
+  "heimer": {
+    "url": "https://github.com/juzzlin/Heimer/blob/master/README.md",
+    "credit": "Heimer README and feature list",
+    "metadata_license": "CC0-1.0",
+    "changes": "Original factual description written for the native package from the reviewed upstream documentation. Native identity, launchers, icons and application license are preserved; upstream media retain their own licenses."
+  },
+  "efibooteditor": {
+    "url": "https://github.com/Neverous/efibooteditor/blob/master/README.md",
+    "credit": "EFI Boot Editor README and command-line usage",
+    "metadata_license": "CC0-1.0",
+    "changes": "Original factual description written for the native package from the reviewed upstream documentation. Native identity, launchers, icons and application license are preserved; upstream media retain their own licenses."
+  },
+  "libation": {
+    "url": "https://github.com/rmcrackan/Libation/blob/master/README.md",
+    "credit": "Libation README and feature list",
+    "metadata_license": "CC0-1.0",
+    "changes": "Original factual description written for the native package from the reviewed upstream documentation. Native identity, launchers, icons and application license are preserved; upstream media retain their own licenses."
+  },
+  "openbangla-keyboard": {
+    "url": "https://github.com/OpenBangla/OpenBangla-Keyboard/blob/master/README.adoc",
+    "credit": "OpenBangla Keyboard README and feature list",
+    "metadata_license": "CC0-1.0",
+    "changes": "Original factual description written for the native package from the reviewed upstream documentation. Native identity, launchers, icons and application license are preserved; upstream media retain their own licenses."
+  },
+  "across": {
+    "url": "https://github.com/ArkToria/ACross/tree/master/misc/screenshots",
+    "credit": "ACross upstream interface screenshots",
+    "metadata_license": "CC0-1.0",
+    "changes": "Original factual description written for the native package from the reviewed upstream documentation. Native identity, launchers, icons and application license are preserved; upstream media retain their own licenses."
   }
 }

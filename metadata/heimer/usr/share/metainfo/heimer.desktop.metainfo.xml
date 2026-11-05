@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<component type="desktop-application">
+  <id>heimer.desktop</id>
+  <name>Heimer</name>
+  <summary>Create mind maps and diagrams</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <url type="homepage">https://github.com/juzzlin/Heimer</url>
+  <description>
+    <p>Heimer is a Qt desktop application for drawing mind maps and other diagrams. Connect ideas with labelled edges, arrange nodes on an adjustable grid and navigate large maps with zoom controls.</p>
+    <p>Maps can be saved as XML-based ALZ files and exported to PNG or SVG images. Automatic layout, text search, autosave and undo and redo tools help organize and revise diagrams.</p>
+  </description>
+</component>

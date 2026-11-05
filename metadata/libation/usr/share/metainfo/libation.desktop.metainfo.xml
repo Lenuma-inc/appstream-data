@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<component type="desktop-application">
+  <id>libation.desktop</id>
+  <name>Libation</name>
+  <summary>Download and organize Audible audiobooks</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <url type="homepage">https://getlibation.com</url>
+  <description>
+    <p>Libation is a desktop application for downloading and managing audiobooks from your Audible library. It supports Audible accounts in multiple regions and can decrypt downloaded books.</p>
+    <p>Search, filter and tag books to organize your collection. Existing libraries, including cover art, can also be imported.</p>
+  </description>
+</component>

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<component type="desktop-application">
+  <id>openbangla-keyboard.desktop</id>
+  <name>OpenBangla Keyboard</name>
+  <summary>Type Bengali using phonetic and fixed keyboard layouts</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <url type="homepage">https://github.com/OpenBangla/OpenBangla-Keyboard</url>
+  <description>
+    <p>OpenBangla Keyboard is a Unicode-compatible Bengali input method for Linux. It supports Avro Phonetic and fixed layouts including Probhat, Munir Optima, Avro Easy, Bornona and National (Jatiya).</p>
+    <p>Typing aids include dictionary suggestions, autocorrection, a layout viewer and a phonetic preview window. Users can edit autocorrect entries and use Avro Keyboard layout files.</p>
+  </description>
+</component>
