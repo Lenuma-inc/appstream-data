@@ -174,6 +174,17 @@ def load_policy(path):
             raise ValueError(f"{key} must be a list of nonempty strings")
     if not isinstance(policy["hide_binary_if_base_exists"], bool):
         raise ValueError("hide_binary_if_base_exists must be boolean")
+    preference = policy.setdefault("duplicate_package_preference", [])
+    if not isinstance(preference, list) or not all(isinstance(p, str) and p for p in preference):
+        raise ValueError("duplicate_package_preference must be a list of nonempty strings")
+    disambiguate = policy.setdefault("disambiguate_duplicate_packages", {})
+    if not isinstance(disambiguate, dict):
+        raise ValueError("disambiguate_duplicate_packages must be an object")
+    for package, settings in disambiguate.items():
+        if (not isinstance(package, str) or not package or not isinstance(settings, dict)
+                or not isinstance(settings.get("id_suffix"), str) or not settings["id_suffix"]
+                or not isinstance(settings.get("name_suffix"), str) or not settings["name_suffix"]):
+            raise ValueError("disambiguate_duplicate_packages entries need id_suffix and name_suffix strings")
     return policy
 
 
@@ -478,9 +489,65 @@ def reconcile_icons(catalog, icon_root, supplemental_root):
     return count
 
 
+def disambiguate_duplicate_components(components, settings=()):
+    """Give configured packages their own component IDs so all editions survive."""
+    if not settings:
+        return
+    xml_lang = "{http://www.w3.org/XML/1998/namespace}lang"
+    counts = Counter(component.findtext("id") for component in components)
+    duplicates = {cid for cid, count in counts.items() if cid and count > 1}
+    used_ids = {component.findtext("id") for component in components if component.findtext("id")}
+    for cid in sorted(duplicates):
+        members = [component for component in components if component.findtext("id") == cid]
+        for component in members:
+            package = next(
+                (p.text for p in component.findall("pkgname")
+                 if p.text in settings),
+                None,
+            )
+            if package is None:
+                continue
+            setting = settings[package]
+            new_id = f"{cid}.{setting['id_suffix']}"
+            index = 2
+            while new_id in used_ids:
+                new_id = f"{cid}.{setting['id_suffix']}{index}"
+                index += 1
+            component.find("id").text = new_id
+            used_ids.add(new_id)
+            for name in component.findall("name"):
+                if name.get(xml_lang) is None and name.text:
+                    name.text = f"{name.text}{setting['name_suffix']}"
+            print(f"Disambiguated component ID: {cid} -> {new_id} ({package})", flush=True)
+
+
+def resolve_duplicate_components(components, preferred_packages=(), disambiguate=()):
+    """Keep the preferred package for a colliding ID; drop unresolved duplicates."""
+    disambiguate_duplicate_components(components, disambiguate)
+    counts = Counter(component.findtext("id") for component in components)
+    duplicates = {cid for cid, count in counts.items() if cid and count > 1}
+    removed = []
+    for cid in sorted(duplicates):
+        members = [component for component in components if component.findtext("id") == cid]
+        chosen = next(
+            (component for package in preferred_packages for component in members
+             if package in (p.text for p in component.findall("pkgname"))),
+            None,
+        )
+        if chosen is None:
+            print(f"Excluded duplicate component ID: {cid}", flush=True)
+            removed.extend(members)
+            continue
+        kept = chosen.findtext("pkgname", "?")
+        print(f"Resolved duplicate component ID: {cid} (kept {kept})", flush=True)
+        removed.extend(component for component in members if component is not chosen)
+    return removed
+
+
 def write_catalog(source, destination, priority, package_names, excluded_components=(),
                   repo=None, enrichment_report=None, enrichment_dir=None,
-                  excluded_packages=()):
+                  excluded_packages=(), preferred_duplicate_packages=(),
+                  disambiguate_duplicate_packages=None):
     with gzip.open(source, "rb") as stream:
         root = ET.parse(stream).getroot()
     if root.tag != "components":
@@ -503,13 +570,11 @@ def write_catalog(source, destination, priority, package_names, excluded_compone
             if not url.startswith(("https://", "http://")):
                 raise ValueError(f"Generated media needs hosting; expected an absolute upstream URL: {url}")
     components = root.findall("component")
-    counts = Counter(c.findtext("id") for c in components)
-    duplicates = {cid for cid, count in counts.items() if cid and count > 1}
-    for cid in sorted(duplicates):
-        print(f"Excluded duplicate component ID: {cid}", flush=True)
+    duplicates = resolve_duplicate_components(components, preferred_duplicate_packages,
+                                              disambiguate_duplicate_packages or {})
     for component in components:
         cid = component.findtext("id", "")
-        if cid in duplicates or any(fnmatch.fnmatchcase(cid, p) for p in excluded_components):
+        if component in duplicates or any(fnmatch.fnmatchcase(cid, p) for p in excluded_components):
             root.remove(component)
     components = root.findall("component")
     if not components:
@@ -619,7 +684,9 @@ def package_repo(repo, config, args):
             origin, count = write_catalog(catalogs[0], catalog, config["priority"], names,
                                           args.policy_data["exclude_components"], repo,
                                           enrichment_report, enrichment_dir,
-                                          args.shadowed_packages.get(repo, {}))
+                                          args.shadowed_packages.get(repo, {}),
+                                          args.policy_data["duplicate_package_preference"],
+                                          args.policy_data["disambiguate_duplicate_packages"])
         finally:
             report = catalog.with_suffix(".validation.yaml")
             if report.is_file():

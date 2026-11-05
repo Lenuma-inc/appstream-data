@@ -1,8 +1,11 @@
 {
-  "exclude_packages": ["*-git", "lunaos-calamares"],
+  "exclude_packages": ["*-git", "lunaos-calamares", "caffeine", "gtkwave-gtk3-tcl"],
   "keep_packages": [],
   "binary_suffixes": ["-bin"],
   "hide_binary_if_base_exists": true,
+  "disambiguate_duplicate_packages": {
+    "wps-office-cn": {"id_suffix": "cn", "name_suffix": " (CN)"}
+  },
   "exclude_components": [
     "discover_overlay_configure.desktop",
     "calamares.desktop",
