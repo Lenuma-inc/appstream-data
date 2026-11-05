@@ -442,6 +442,42 @@ def unpack_icons(archive_path, destination):
             target.chmod(0o644)
 
 
+def reconcile_icons(catalog, icon_root, supplemental_root):
+    root = ET.fromstring(gzip.decompress(catalog.read_bytes()))
+    for icon in list(root.iter("icon")):
+        if icon.get("type") != "cached":
+            continue
+        size = f"{icon.get('width', '64')}x{icon.get('height', '64')}"
+        if icon.get("scale", "1") != "1":
+            size += "@" + icon.get("scale")
+        filename = icon.text or ""
+        if (not filename or filename in (".", "..")
+                or PurePosixPath(filename).name != filename
+                or not re.fullmatch(r"\d+x\d+(?:@\d+)?", size)):
+            raise ValueError(f"Unsafe cached icon: {size}/{filename}")
+        if PurePosixPath(filename).name == filename and not (icon_root / size / filename).is_file():
+            supplemental_icon = supplemental_root / size / filename
+            if supplemental_icon.is_file():
+                (icon_root / size).mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(supplemental_icon, icon_root / size / filename)
+        if PurePosixPath(filename).name != filename or not (icon_root / size / filename).is_file():
+            if not filename or PurePosixPath(filename).name != filename:
+                raise ValueError(f"Unsafe cached icon: {filename}")
+            for component in root.findall("component"):
+                if icon in list(component):
+                    print(f"Excluded missing cached icon: {component.findtext('id')}: {size}/{filename}", flush=True)
+                    component.remove(icon)
+                    if not component.findall("icon"):
+                        root.remove(component)
+                    break
+    count = len(root.findall("component"))
+    if not count:
+        raise ValueError("Generated catalog is empty after icon verification")
+    with catalog.open("wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as out:
+        ET.ElementTree(root).write(out, encoding="utf-8", xml_declaration=True)
+    return count
+
+
 def write_catalog(source, destination, priority, package_names, excluded_components=(),
                   repo=None, enrichment_report=None, enrichment_dir=None,
                   excluded_packages=()):
@@ -590,32 +626,15 @@ def package_repo(repo, config, args):
                 shutil.copyfile(report, output / "validation.yaml")
         if origin in ("archlinux", "archlinux-arch-extra", "archlinux-arch-core"):
             raise ValueError("Catalog origin must not replace Arch Linux metadata")
-        archives = []
         for icons in sorted((workspace / "export").rglob("*")):
             match = re.fullmatch(r"icons-(\d+x\d+(?:@\d+)?)\.tar(?:\.(?:gz|xz|zst))?",
                                  icons.name, flags=re.IGNORECASE)
             if not match or not icons.is_file():
                 continue
             size = match.group(1)
-            archives.append(str(icons.relative_to(workspace)))
             unpack_icons(icons, share / "swcatalog/icons" / origin / size)
         icon_root = share / "swcatalog/icons" / origin
-        for icon in ET.fromstring(gzip.decompress(catalog.read_bytes())).iter("icon"):
-            if icon.get("type") != "cached":
-                continue
-            size = f"{icon.get('width', '64')}x{icon.get('height', '64')}"
-            if icon.get("scale", "1") != "1":
-                size += "@" + icon.get("scale")
-            filename = icon.text or ""
-            if PurePosixPath(filename).name == filename and not (icon_root / size / filename).is_file():
-                supplemental_icon = enrichment_dir / "icons" / size / filename
-                if supplemental_icon.is_file():
-                    (icon_root / size).mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(supplemental_icon, icon_root / size / filename)
-            if PurePosixPath(filename).name != filename or not (icon_root / size / filename).is_file():
-                layout = [str(p.relative_to(workspace)) for p in (workspace / "export").rglob("*") if p.is_file()]
-                raise ValueError(f"Missing cached icon: {size}/{filename}; "
-                                 f"icon archives={archives}; exported files={layout}")
+        count = reconcile_icons(catalog, icon_root, enrichment_dir / "icons")
         manifest.update({"origin": origin, "components": count, "priority": config["priority"]})
         enrichment_sources = enrichment_dir / "sources.json"
         if enrichment_sources.is_file():
