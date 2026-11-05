@@ -1,8 +1,8 @@
 import unittest
 import xml.etree.ElementTree as ET
 
-from generate import (apply_policy, load_policy, repository_shadows,
-                      resolve_duplicate_components, ROOT)
+from generate import (apply_component_names, apply_policy, load_policy,
+                      repository_shadows, resolve_duplicate_components, ROOT)
 
 
 def package_component(cid, package, name="Example"):
@@ -53,6 +53,37 @@ class RepositoryPolicyTests(unittest.TestCase):
         self.assertNotIn("wps-office-cn", policy["exclude_packages"])
         self.assertEqual(policy["disambiguate_duplicate_packages"],
                          {"wps-office-cn": {"id_suffix": "cn", "name_suffix": " (CN)"}})
+        self.assertEqual(policy["component_names"],
+                         {"wps-office-wps.desktop": "WPS Office"})
+
+    def test_suite_packages_keep_one_component_per_package(self):
+        policy = load_policy(ROOT / "policy.json")
+        excluded = policy["exclude_components"]
+
+        for component in ("wps-office-et.desktop*", "wps-office-wpp.desktop*",
+                          "wps-office-pdf.desktop*", "wps-office-prometheus.desktop*"):
+            self.assertIn(component, excluded)
+        self.assertNotIn("wps-office-wps.desktop*", excluded)
+
+        for component in ("libreoffice-base.desktop", "libreoffice-calc.desktop",
+                          "libreoffice-draw.desktop", "libreoffice-impress.desktop",
+                          "libreoffice-math.desktop", "libreoffice-writer.desktop"):
+            self.assertIn(component, excluded)
+        self.assertNotIn("libreoffice-startcenter.desktop", excluded)
+
+    def test_suite_name_is_applied_before_edition_suffix(self):
+        components = [
+            package_component("wps-office-wps.desktop", "wps-office", "WPS Writer"),
+            package_component("wps-office-wps.desktop", "wps-office-cn", "WPS 文字"),
+        ]
+        apply_component_names(components, {"wps-office-wps.desktop": "WPS Office"})
+        resolve_duplicate_components(
+            components, disambiguate={"wps-office-cn": {"id_suffix": "cn", "name_suffix": " (CN)"}})
+
+        self.assertEqual(components[0].findtext("id"), "wps-office-wps.desktop")
+        self.assertEqual(components[0].findtext("name"), "WPS Office")
+        self.assertEqual(components[1].findtext("id"), "wps-office-wps.desktop.cn")
+        self.assertEqual(components[1].findtext("name"), "WPS Office (CN)")
 
     def test_duplicate_component_ids_can_keep_both_editions(self):
         components = [

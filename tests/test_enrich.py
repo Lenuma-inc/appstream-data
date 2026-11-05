@@ -271,6 +271,58 @@ class EnrichmentTests(unittest.TestCase):
             enrich.apply_enrichment(root, "chaotic-aur", {"example"}, directory=directory)
             self.assertEqual(root.findtext("component/.//image"), "https://example.org/working.png")
 
+    def test_duplicate_component_ids_are_enriched_per_package(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            root = ET.Element("components")
+            supplements = ET.Element("components")
+            for package in ("wps-office", "wps-office-cn"):
+                native = component(cid="wps-office-wps.desktop", package=package, name="WPS Writer")
+                root.append(native)
+                supplements.append(component(
+                    description="WPS Office is an office suite for documents, spreadsheets and presentations. " * 3,
+                    screenshot=f"https://example.org/{package}.png",
+                    cid="wps-office-wps.desktop",
+                    package=package,
+                    name="WPS Office",
+                ))
+            ET.ElementTree(supplements).write(directory / "chaotic-aur.xml")
+
+            enrich.apply_enrichment(root, "chaotic-aur", {"wps-office", "wps-office-cn"},
+                                    directory=directory)
+
+            results = {item.findtext("pkgname"): item for item in root.findall("component")}
+            self.assertIn("office suite", results["wps-office"].findtext("description/p"))
+            self.assertIn("office suite", results["wps-office-cn"].findtext("description/p"))
+            self.assertEqual(results["wps-office"].findtext(".//image"),
+                             "https://example.org/wps-office.png")
+            self.assertEqual(results["wps-office-cn"].findtext(".//image"),
+                             "https://example.org/wps-office-cn.png")
+
+    def test_reference_catalog_keeps_only_the_suite_launcher(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            catalogs = directory / "xml"
+            catalogs.mkdir()
+            root = ET.Element("components")
+            for cid in ("libreoffice-base.desktop", "libreoffice-calc.desktop",
+                        "libreoffice-draw.desktop", "libreoffice-impress.desktop",
+                        "libreoffice-math.desktop", "libreoffice-writer.desktop",
+                        "libreoffice-startcenter.desktop"):
+                root.append(component(cid=cid, package="libreoffice-fresh", name="LibreOffice"))
+            root.append(component(cid="org.libreoffice.kde", package="libreoffice-fresh",
+                                  name="LibreOffice KDE Integration"))
+            (catalogs / "extra.xml.gz").write_bytes(gzip.compress(ET.tostring(root)))
+            snapshot = directory / "flathub.xml.gz"
+            snapshot.write_bytes(gzip.compress(ET.tostring(ET.Element("components"))))
+
+            enrich.import_catalogs(catalogs, snapshot, directory / "output", directory / "no-databases")
+
+            enriched = ET.fromstring(gzip.decompress(
+                (directory / "output/extra-enriched.xml.gz").read_bytes()))
+            self.assertEqual([item.findtext("id") for item in enriched.findall("component")],
+                             ["libreoffice-startcenter.desktop"])
+
     def test_flatpak_instructions_and_thumbnails_are_not_imported(self):
         upstream = component("Useful portable description. " * 10, "https://example.org/original.png")
         ET.SubElement(upstream.find("description"), "p").text = "Install a Flatpak permission override."

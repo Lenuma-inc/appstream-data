@@ -185,6 +185,11 @@ def load_policy(path):
                 or not isinstance(settings.get("id_suffix"), str) or not settings["id_suffix"]
                 or not isinstance(settings.get("name_suffix"), str) or not settings["name_suffix"]):
             raise ValueError("disambiguate_duplicate_packages entries need id_suffix and name_suffix strings")
+    component_names = policy.setdefault("component_names", {})
+    if (not isinstance(component_names, dict)
+            or not all(isinstance(cid, str) and cid and isinstance(name, str) and name
+                       for cid, name in component_names.items())):
+        raise ValueError("component_names must map component IDs to nonempty names")
     return policy
 
 
@@ -489,11 +494,22 @@ def reconcile_icons(catalog, icon_root, supplemental_root):
     return count
 
 
+def apply_component_names(components, names=()):
+    """Present a package's remaining component under a suite-level name."""
+    if not names:
+        return
+    for component in components:
+        name = names.get(component.findtext("id", ""))
+        if not name:
+            continue
+        for element in component.findall("name"):
+            element.text = name
+
+
 def disambiguate_duplicate_components(components, settings=()):
     """Give configured packages their own component IDs so all editions survive."""
     if not settings:
         return
-    xml_lang = "{http://www.w3.org/XML/1998/namespace}lang"
     counts = Counter(component.findtext("id") for component in components)
     duplicates = {cid for cid, count in counts.items() if cid and count > 1}
     used_ids = {component.findtext("id") for component in components if component.findtext("id")}
@@ -516,7 +532,7 @@ def disambiguate_duplicate_components(components, settings=()):
             component.find("id").text = new_id
             used_ids.add(new_id)
             for name in component.findall("name"):
-                if name.get(xml_lang) is None and name.text:
+                if name.text:
                     name.text = f"{name.text}{setting['name_suffix']}"
             print(f"Disambiguated component ID: {cid} -> {new_id} ({package})", flush=True)
 
@@ -547,7 +563,7 @@ def resolve_duplicate_components(components, preferred_packages=(), disambiguate
 def write_catalog(source, destination, priority, package_names, excluded_components=(),
                   repo=None, enrichment_report=None, enrichment_dir=None,
                   excluded_packages=(), preferred_duplicate_packages=(),
-                  disambiguate_duplicate_packages=None):
+                  disambiguate_duplicate_packages=None, component_names=None):
     with gzip.open(source, "rb") as stream:
         root = ET.parse(stream).getroot()
     if root.tag != "components":
@@ -570,6 +586,7 @@ def write_catalog(source, destination, priority, package_names, excluded_compone
             if not url.startswith(("https://", "http://")):
                 raise ValueError(f"Generated media needs hosting; expected an absolute upstream URL: {url}")
     components = root.findall("component")
+    apply_component_names(components, component_names or {})
     duplicates = resolve_duplicate_components(components, preferred_duplicate_packages,
                                               disambiguate_duplicate_packages or {})
     for component in components:
@@ -686,7 +703,8 @@ def package_repo(repo, config, args):
                                           enrichment_report, enrichment_dir,
                                           args.shadowed_packages.get(repo, {}),
                                           args.policy_data["duplicate_package_preference"],
-                                          args.policy_data["disambiguate_duplicate_packages"])
+                                          args.policy_data["disambiguate_duplicate_packages"],
+                                          args.policy_data["component_names"])
         finally:
             report = catalog.with_suffix(".validation.yaml")
             if report.is_file():

@@ -139,5 +139,17 @@
     "credit": "JuliaLang contributors",
     "metadata_license": "CC-BY-SA-3.0",
     "changes": "Official upstream AppStream metadata; native identity, launchers, icons and application license are preserved. The screenshot references the official project asset."
+  },
+  "wps-office": {
+    "url": "https://www.wps.com/",
+    "credit": "Kingsoft Office Corporation; supplemental metainfo by LunaOS contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Authored suite-level metainfo based on the official product description; one component represents the complete package instead of separate Writer, Spreadsheets, Presentation and PDF launchers. Screenshots are official WPS Office product images and retain their upstream licenses."
+  },
+  "wps-office-cn": {
+    "url": "https://linux.wps.cn/",
+    "credit": "Kingsoft Office Corporation; supplemental metainfo by LunaOS contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Authored suite-level metainfo for the Chinese edition based on the official product information; one component represents the complete package instead of separate Writer, Spreadsheets, Presentation and PDF launchers. Screenshots are official WPS Office product images and retain their upstream licenses."
   }
 }

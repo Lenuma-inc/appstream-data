@@ -640,13 +640,16 @@ def apply_enrichment(root, repo, package_names, directory=None):
     path = directory / f"{repo}.xml"
     if not path.is_file():
         return applied
-    by_id = {c.findtext("id"): c for c in root.findall("component")}
+    by_package_and_id = {
+        (component.findtext("pkgname"), component.findtext("id")): component
+        for component in root.findall("component")
+    }
     for supplement in ET.parse(path).getroot().findall("component"):
         name, cid = supplement.findtext("pkgname"), supplement.findtext("id")
         if not name or not cid:
             raise ValueError(f"Missing package/component ID in {path}")
-        native = by_id.get(cid)
-        if native is None or name not in package_names or native.findtext("pkgname") != name:
+        native = by_package_and_id.get((name, cid))
+        if native is None or name not in package_names:
             continue
         fields = sources.get(f"{repo}/{cid}", {}).get("fields", [])
         changed = merge_presentation(native, supplement, "refreshed-screenshots" in fields)
@@ -720,6 +723,14 @@ def import_catalogs(catalog_dir, flathub_path, output, database_dir=Path("/var/l
             continue
         catalog = ET.fromstring(gzip.decompress(path.read_bytes()))
         full_catalog = copy.deepcopy(catalog)
+        if repo in ("extra", "core", "multilib"):
+            # Reference catalogs are repackaged verbatim, so apply the same
+            # component policy here as write_catalog does for generated repos.
+            for component in list(full_catalog.findall("component")):
+                cid = component.findtext("id", "")
+                if any(fnmatch.fnmatchcase(cid, pattern)
+                       for pattern in policy["exclude_components"]):
+                    full_catalog.remove(component)
         full_components = {c.findtext("id"): c for c in full_catalog.findall("component")}
         origin = catalog.get("origin", "")
         imported = ET.Element("components", version="1.0")

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>cn.wps.Office</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary=https://www.wps.com/eula/</project_license>
+  <name>WPS Office (CN)</name>
+  <summary>Office suite for documents, spreadsheets and presentations (Chinese edition)</summary>
+  <description>
+    <p>WPS Office combines Writer, Presentation and Spreadsheets in one office suite. The Chinese edition includes the latest Chinese-language interface and translation updates from Kingsoft.</p>
+    <p>The package installs the complete suite, so one entry provides access to all of its editors.</p>
+  </description>
+  <launchable type="desktop-id">wps-office-wps.desktop</launchable>
+  <url type="homepage">https://linux.wps.cn/</url>
+  <developer id="com.wps">
+    <name>Kingsoft Office Corporation</name>
+  </developer>
+  <categories>
+    <category>Office</category>
+  </categories>
+  <screenshots>
+    <screenshot type="default">
+      <caption>WPS Writer</caption>
+      <image type="source">https://website-prod.cache.wpscdn.com/img/slider_3.c233a64.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>WPS Spreadsheets</caption>
+      <image type="source">https://website-prod.cache.wpscdn.com/img/slider_1.3a423d4.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>WPS Presentation</caption>
+      <image type="source">https://website-prod.cache.wpscdn.com/img/slider_4.c704a50.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+</component>

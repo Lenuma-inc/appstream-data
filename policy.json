@@ -6,11 +6,27 @@
   "disambiguate_duplicate_packages": {
     "wps-office-cn": {"id_suffix": "cn", "name_suffix": " (CN)"}
   },
+  "component_names": {
+    "wps-office-wps.desktop": "WPS Office"
+  },
   "exclude_components": [
     "discover_overlay_configure.desktop",
     "calamares.desktop",
     "zenmap-root.desktop",
     "nwg-readme.desktop",
+
+    "wps-office-et.desktop*",
+    "wps-office-wpp.desktop*",
+    "wps-office-pdf.desktop*",
+    "wps-office-prometheus.desktop*",
+
+    "libreoffice-base.desktop",
+    "libreoffice-calc.desktop",
+    "libreoffice-draw.desktop",
+    "libreoffice-impress.desktop",
+    "libreoffice-math.desktop",
+    "libreoffice-writer.desktop",
+    "org.libreoffice.kde",
 
     "jconsole-*.desktop",
     "jshell-*.desktop",
