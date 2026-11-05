@@ -81,7 +81,9 @@ jobs:
               --dir "$previous_dir"
           fi
           version=$(sed -n 's/^pkgver=//p' PKGBUILD)
+          release=$(sed -n 's/^pkgrel=//p' PKGBUILD)
           result=$(python compare-catalogs.py --previous-dir "$previous_dir" \
+            --notes-file release-notes.md --previous-tag "$previous_tag" --current-tag "$version-$release" \
             --current "dist/lunaos-appstream-data/lunaos-appstream-data-$version.tar.gz" \
             --current "dist/chaotic-aur-appstream-data/chaotic-aur-appstream-data-$version.tar.gz" \
             --current "dist/archlinux-appstream-data/archlinux-appstream-data-$version.tar.gz")
@@ -104,7 +106,7 @@ jobs:
           release=$(sed -n 's/^pkgrel=//p' PKGBUILD)
           gh release create "$version-$release" --target "$GITHUB_SHA" \
             --title "$version-$release" \
-            --notes 'Generated LunaOS, Chaotic-AUR, and enriched Arch AppStream catalogs.' \
+            --notes-file release-notes.md \
             dist/lunaos-appstream-data/*.tar.gz dist/chaotic-aur-appstream-data/*.tar.gz \
             dist/archlinux-appstream-data/*.tar.gz
       - name: Publish successful catalog version for lunaos-repo buildbot

@@ -5,3 +5,4 @@ __pycache__/
 *.tar.*
 /pkg/
 /src/
+.pz
