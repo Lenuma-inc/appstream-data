@@ -1,18 +1,18 @@
 pkgbase = lunaos-appstream-data
 	pkgdesc = AppStream application catalogs for LunaOS, Arch Linux, and Chaotic-AUR
-	pkgver = 20261106
+	pkgver = 20261107
 	pkgrel = 1
 	url = https://github.com/Lenuma-inc/appstream-data
 	arch = any
 	license = LicenseRef-AppStream-Data
 	options = !strip
 	options = !debug
-	source = https://github.com/Lenuma-inc/appstream-data/releases/download/20261106-1/lunaos-appstream-data-20261106.tar.gz
-	source = https://github.com/Lenuma-inc/appstream-data/releases/download/20261106-1/chaotic-aur-appstream-data-20261106.tar.gz
-	source = https://github.com/Lenuma-inc/appstream-data/releases/download/20261106-1/archlinux-appstream-data-20261106.tar.gz
-	sha256sums = 5ad09b688cacc99d0dc16636119817a59336a26b3e9b1d6e36cb5d809b06f08d
-	sha256sums = dd997d35fd7c268be1e3893a579747bbd0e87d8bf1e7012bd7747d42a024533c
-	sha256sums = caf51b6c63f171a789b669c2bd65bd228382f8846fb9f509a32a306a6a4549d6
+	source = https://github.com/Lenuma-inc/appstream-data/releases/download/20261107-1/lunaos-appstream-data-20261107.tar.gz
+	source = https://github.com/Lenuma-inc/appstream-data/releases/download/20261107-1/chaotic-aur-appstream-data-20261107.tar.gz
+	source = https://github.com/Lenuma-inc/appstream-data/releases/download/20261107-1/archlinux-appstream-data-20261107.tar.gz
+	sha256sums = 9f31bc8fa90aea717c8f0634385e5d4e5d11da750820ae63363ccae96eff42cb
+	sha256sums = c116074925506347ab3341aa199436ef1b18d30da9087f64d982d3e3c037c909
+	sha256sums = 23a6ceb00d555730012ec3f9346cb63d57a509b76afe764a1ed4735b6f2ebabc
 
 pkgname = lunaos-appstream-data
 	pkgdesc = AppStream application catalog and icons for the LunaOS repository
