@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.ungoogled_software.ungoogled_chromium</id>
+  <name>Ungoogled Chromium</name>
+  <summary>Chromium browser without Google web service integration</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>BSD-3-Clause</project_license>
+  <description>
+    <p>Ungoogled Chromium is a web browser based on Chromium. It removes integration with Google web services while keeping the familiar Chromium interface and browsing features.</p>
+  </description>
+  <launchable type="desktop-id">chromium.desktop</launchable>
+  <url type="homepage">https://github.com/ungoogled-software/ungoogled-chromium</url>
+  <url type="bugtracker">https://github.com/ungoogled-software/ungoogled-chromium/issues</url>
+</component>

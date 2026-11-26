@@ -30,10 +30,16 @@ class ReferencePackageTests(unittest.TestCase):
                 enriched = ET.Element("components", version="1.0", origin=f"archlinux-arch-{repo}")
                 component = ET.SubElement(enriched, "component", type="desktop-application")
                 ET.SubElement(component, "id").text = f"enriched-{repo}"
+                if repo == "extra":
+                    for package in ("deepin-terminal-gtk", "deepin-terminal"):
+                        terminal = ET.SubElement(enriched, "component", type="desktop-application")
+                        ET.SubElement(terminal, "id").text = f"{package}.desktop"
+                        ET.SubElement(terminal, "pkgname").text = package
                 with gzip.open(enriched_dir / f"{repo}-enriched.xml.gz", "wb") as stream:
                     ET.ElementTree(enriched).write(stream, encoding="utf-8", xml_declaration=True)
 
-            args = SimpleNamespace(work=root / "work", output=root / "dist", version="20261025")
+            args = SimpleNamespace(work=root / "work", output=root / "dist", version="20261025",
+                                   policy_data=generate.load_policy(generate.ROOT / "policy.json"))
             generate.package_reference_catalogs(args, source)
             archive_path = args.output / "archlinux-appstream-data/archlinux-appstream-data-20261025.tar.gz"
             with tarfile.open(archive_path, "r:gz") as archive:
@@ -45,6 +51,8 @@ class ReferencePackageTests(unittest.TestCase):
                 catalog = ET.fromstring(gzip.decompress(archive.extractfile(member).read()))
                 self.assertEqual(catalog.get("origin"), "archlinux-arch-extra")
                 self.assertEqual(catalog.findtext("component/id"), "enriched-extra")
+                self.assertEqual([node.text for node in catalog.findall("component/pkgname")],
+                                 ["deepin-terminal"])
 
 
 if __name__ == "__main__":

@@ -124,20 +124,26 @@ def database_names(path, architecture):
     return names
 
 
+def package_exclusion_pattern(name, policy):
+    if name not in policy["keep_packages"]:
+        return next((p for p in policy["exclude_packages"] if fnmatch.fnmatchcase(name, p)), None)
+    return None
+
+
 def apply_policy(selected, available, policy, shadowed=None):
     """Filter visibility before asgen can collapse duplicate component IDs."""
     keep = set(policy["keep_packages"])
     excluded = {}
     visible = available - {
         name for name in available
-        if name not in keep and any(fnmatch.fnmatchcase(name, p) for p in policy["exclude_packages"])
+        if package_exclusion_pattern(name, policy)
     }
     result = {}
     for dirname, record in selected.items():
         name = record["fields"]["NAME"][0]
         reason = f"preferred repository: {shadowed[name]}" if shadowed and name in shadowed else None
         if reason is None and name not in keep:
-            pattern = next((p for p in policy["exclude_packages"] if fnmatch.fnmatchcase(name, p)), None)
+            pattern = package_exclusion_pattern(name, policy)
             if pattern:
                 reason = f"exclude_packages: {pattern}"
             elif policy["hide_binary_if_base_exists"]:
@@ -775,7 +781,15 @@ def package_reference_catalogs(args, reference_root=Path("/usr/share/swcatalog")
         for repo in ("extra", "core", "multilib"):
             shutil.copytree(source_root / "icons" / f"archlinux-arch-{repo}",
                             icon_root / f"archlinux-arch-{repo}")
-            shutil.copyfile(enrichment / f"{repo}-enriched.xml.gz", xml_dir / f"{repo}.xml.gz")
+            with gzip.open(enrichment / f"{repo}-enriched.xml.gz", "rb") as stream:
+                catalog = ET.parse(stream)
+            for component in catalog.findall("component"):
+                if any(package_exclusion_pattern(name.text or "", args.policy_data)
+                       for name in component.findall("pkgname")):
+                    catalog.getroot().remove(component)
+            with (xml_dir / f"{repo}.xml.gz").open("wb") as raw, \
+                    gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as stream:
+                catalog.write(stream, encoding="utf-8", xml_declaration=True)
         doc = stage / "usr/share/doc/archlinux-appstream-data"
         doc.mkdir(parents=True)
         provenance = enrichment / "sources.json"

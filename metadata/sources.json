@@ -1,4 +1,10 @@
 {
+  "ungoogled-chromium-bin": {
+    "url": "https://github.com/ungoogled-software/ungoogled-chromium",
+    "credit": "LunaOS contributors",
+    "metadata_license": "CC0-1.0",
+    "changes": "Original metainfo for the native package: distinct AppStream ID and display name, retaining the packaged chromium.desktop launcher."
+  },
   "minecraft-launcher": {
     "url": "https://github.com/flathub/com.mojang.Minecraft/blob/master/com.mojang.Minecraft.appdata.xml",
     "credit": "Flathub contributors",

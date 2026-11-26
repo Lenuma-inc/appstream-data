@@ -567,7 +567,7 @@ class EnrichmentTests(unittest.TestCase):
             cases = (
                 ("chromium", "chromium.desktop", "org.chromium.Chromium", "Chromium"),
                 ("google-chrome", "google-chrome.desktop", "com.google.Chrome", "Google Chrome"),
-                ("ungoogled-chromium-bin", "chromium.desktop",
+                ("ungoogled-chromium-bin", "io.github.ungoogled_software.ungoogled_chromium",
                  "io.github.ungoogled_software.ungoogled_chromium", "Ungoogled Chromium"),
                 ("microsoft-edge-stable-bin", "microsoft-edge.desktop",
                  "com.microsoft.Edge", "Microsoft Edge"),
@@ -621,7 +621,9 @@ class EnrichmentTests(unittest.TestCase):
                 self.assertEqual(by_package[package].findtext("id"), cid)
                 self.assertIn("flathub.example", by_package[package].findtext(".//image"))
                 self.assertEqual(audit[package]["source_id"], flatpak_id)
-                self.assertIn("explicit-native-package", audit[package]["match"])
+                expected_match = ("reviewed-native-metainfo" if package == "ungoogled-chromium-bin"
+                                  else "explicit-native-package")
+                self.assertIn(expected_match, audit[package]["match"])
             self.assertGreater(enrich.description_length(by_package["google-chrome"]), 160)
 
 

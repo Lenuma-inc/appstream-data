@@ -1,5 +1,5 @@
 {
-  "exclude_packages": ["*-git", "lunaos-calamares", "caffeine", "gtkwave-gtk3-tcl"],
+  "exclude_packages": ["*-git", "lunaos-calamares", "caffeine", "gtkwave-gtk3-tcl", "deepin-terminal-gtk"],
   "keep_packages": [],
   "binary_suffixes": ["-bin"],
   "hide_binary_if_base_exists": true,
