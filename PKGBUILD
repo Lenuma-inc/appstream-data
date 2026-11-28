@@ -1,7 +1,7 @@
 # Package catalogs already generated and published by CI.
 pkgbase=lunaos-appstream-data
 pkgname=('lunaos-appstream-data' 'chaotic-aur-appstream-data' 'lunaos-appstream-data-common' 'archlinux-appstream-data')
-pkgver=20261127
+pkgver=20261128
 pkgrel=1
 pkgdesc='AppStream application catalogs for LunaOS, Arch Linux, and Chaotic-AUR'
 arch=('any')
@@ -12,9 +12,9 @@ options=('!strip' '!debug')
 source=("${url}/releases/download/${pkgver}-${pkgrel}/lunaos-appstream-data-${pkgver}.tar.gz"
         "${url}/releases/download/${pkgver}-${pkgrel}/chaotic-aur-appstream-data-${pkgver}.tar.gz"
         "${url}/releases/download/${pkgver}-${pkgrel}/archlinux-appstream-data-${pkgver}.tar.gz")
-sha256sums=('2a42f2b9a7b0ea7df9acc9f7ae7bd46b3990147cd256e0fb7f4d5b311ee79d58'
-            '475a2f9648991f45690fef6d21a39d1f8694d98ebcd289765a0c876ae4b7716d'
-            '10727ea899b3db7c291885998cc313d1ad5f094abb68dee9fa5f3ff7aa153a09')
+sha256sums=('9a318f0fe79557606ff9d1d135a23ab9c36a7b0627373f6cbed15cc471304465'
+            '596359104796debece761498a02cf7a6f2bf7673c5098359e9e0c561407c3514'
+            'e3dd477f8981c9abc7055bac9608fdc39e7a052be786e1654d7db13233c56953')
 
 _install_catalog() {
   install -dm755 "$pkgdir/usr/share"
